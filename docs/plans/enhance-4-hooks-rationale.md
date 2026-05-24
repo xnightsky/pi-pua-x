@@ -59,7 +59,9 @@ hooks/hooks.json → "PreToolUse" → integrity-guard.sh
 - `PROTECTED_WRITE_PATTERNS`：tests/evals/CI/scoring/memory/.env
 - `CONTAMINATION_PATTERNS`：hidden_tests/hidden_solution/gold_patch
 - `SENSITIVE_READ_PATTERNS`：.env/secrets/credentials/private_key
+- `WEB_CONTAMINATION`：检测 WebSearch/WebFetch 中搜索 hidden solution
 - 四权分立语义：行动权 / 自我评价权 / 评分权 / 环境修改权
+- 上游 deny 语义：返回 `permissionDecision: "deny"` → Claude Code 弹确认对话框让用户选择，不是无条件阻止
 
 **重复命令检测**（上游无直接等价，但属于 L2+ 压力升级的执行层）：
 - 上游在 `failure-detector.sh` 的 L2 输出中要求"switch to fundamentally different approach"

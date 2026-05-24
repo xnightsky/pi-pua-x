@@ -96,7 +96,8 @@ PI 机制进一步拆分如下：
 当前 `index.ts` 不包含以下能力：
 
 - 不调用 `pi.registerTool()`，因此不向模型新增任何工具。
-- `tool_call` 只修改子 agent prompt，不拦截、不确认、不授权任何工具调用。
+- `tool_call` 子 agent 装饰只修改子 agent prompt，不拦截、不确认、不授权任何工具调用。
+- `tool_call` 四权分立只在 `enforcement_level="enforce"` 时硬 block；默认 `suggest` 模式下仅通知不阻止（对齐上游“弹确认”语义）。
 - 不读取或执行外部插件配置来做权限判断。
 - 不屏蔽 shell、PowerShell、MCP、web search 或子任务工具。
 - 不实现危险命令确认、目录沙箱、allowlist、denylist 或用户确认 gate。
