@@ -1,0 +1,17 @@
+{
+  "name": "pi-pua-x",
+  "version": "0.1.0",
+  "description": "Stateful PUA runtime extension for pi — lifecycle hooks, pressure escalation, capability-aware enhancement, and subagent inheritance",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xnightsky/pi-pua-x.git"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  }
+}

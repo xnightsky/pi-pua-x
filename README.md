@@ -35,11 +35,12 @@ See [INSTALL.md](./INSTALL.md) for full instructions.
 Quick start:
 
 ```bash
-# 1. Install tanweai/pua skill (prerequisite)
-# 2. Copy extension to pi extensions directory:
+# 推荐：通过 pi install
+pi install git:github.com/xnightsky/pi-pua-x
+
+# 或手动复制（local cp）
 mkdir -p ~/.pi/agent/extensions/pua
 cp -R ./* ~/.pi/agent/extensions/pua/
-# 3. Restart pi
 ```
 
 ## Commands

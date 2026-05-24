@@ -2,7 +2,37 @@
 
 能力开关、插件矩阵、可见性边界和正向增强规则见 [docs/CAPABILITIES.md](./docs/CAPABILITIES.md)；内部设计和后续落地契约见 [docs/DESIGN.md](./docs/DESIGN.md)。
 
-## 当前 PUA PI 插件生命周期
+## 通过 pi install 安装（推荐）
+
+`pi install` 是 pi 内置的包管理命令，支持 git 和本地路径两种方式：
+
+```bash
+# 从 GitHub 安装（全局）
+pi install git:github.com/xnightsky/pi-pua-x
+
+# 从本地路径安装（开发用）
+pi install ./path/to/pi-pua-x
+
+# 安装到项目级（团队共享，写入 .pi/settings.json）
+pi install -l git:github.com/xnightsky/pi-pua-x
+
+# 卸载
+pi remove git:github.com/xnightsky/pi-pua-x
+
+# 临时试用（不写入 settings）
+pi -e git:github.com/xnightsky/pi-pua-x
+```
+
+安装后重启 pi 即自动加载，无需手动复制文件。更新使用 `pi update` 或重新 install 指定新 ref：
+
+```bash
+# 锁定到特定版本
+pi install git:github.com/xnightsky/pi-pua-x@v0.1.0
+```
+
+---
+
+## 手动安装（local cp 机制）
 
 本节操作主体是当前 PUA PI extension 本体，即 `./` 这套插件目录。以下命令默认在仓库的 `./` 目录下执行，安装目标为 PI 扩展目录 `~/.pi/agent/extensions/pua/`。
 
