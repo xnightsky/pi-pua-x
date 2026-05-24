@@ -222,6 +222,10 @@ export default function (pi: ExtensionAPI) {
   const commandHistory = new CommandHistory(5);
   /** 最近失败的工具命令摘要（用于 compact state save） */
   let recentFailures: string[] = [];
+  /** advisory 通知冷却记录：target → 上次通知时间戳 */
+  const advisoryCooldown: Map<string, number> = new Map();
+  /** advisory 冷却时间（毫秒） */
+  const ADVISORY_COOLDOWN_MS = 30_000;
 
   /**
    * 从文件系统恢复完整运行时状态（配置、失败计数、扩展私有状态）。
@@ -470,15 +474,34 @@ export default function (pi: ExtensionAPI) {
     const toolName = event.toolName ?? event.tool_name ?? event.name ?? "";
     const input = event.input ?? event.args ?? event.arguments;
 
-    // 四权分立检查
+    // 四权分立检查：根据 enforcement_level 决定处缆力度
+    // observe  = 全部静默（不通知、不 block）
+    // suggest  = advisory 通知 + deny 通知但不 block（对齐上游语义）
+    // enforce  = advisory 通知 + deny 硬 block
     if (enforcementConfig.integrity_guard) {
       const result = checkIntegrity(toolName, input);
+      const level = enforcementConfig.enforcement_level;
+
       if (result.level === "deny") {
-        ctx.ui.notify(`[PUA Integrity Guard] DENY: ${result.reason}\nTarget: ${result.target}`, "error");
-        return { block: true, reason: result.reason };
+        if (level === "enforce") {
+          ctx.ui.notify(`[PUA Integrity Guard] DENY: ${result.reason}\nTarget: ${result.target}`, "error");
+          return { block: true, reason: result.reason };
+        }
+        if (level === "suggest") {
+          ctx.ui.notify(`[PUA Integrity Guard] 警告: ${result.reason}\nTarget: ${result.target}`, "error");
+        }
+        // observe: 静默
       }
-      if (result.level === "advisory") {
-        ctx.ui.notify(`[PUA Integrity Guard] 注意: ${result.reason}\nTarget: ${result.target}`, "warning");
+
+      if (result.level === "advisory" && level !== "observe") {
+        // 30s 内同一 target 不重复通知
+        const now = Date.now();
+        const key = result.target ?? "";
+        const lastNotify = advisoryCooldown.get(key) ?? 0;
+        if (now - lastNotify > ADVISORY_COOLDOWN_MS) {
+          advisoryCooldown.set(key, now);
+          ctx.ui.notify(`[PUA Integrity Guard] 注意: ${result.reason}\nTarget: ${result.target}`, "warning");
+        }
       }
     }
 
