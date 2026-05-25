@@ -186,7 +186,7 @@ export function loadFlavorInfo(flavorKey: string): FlavorInfo {
   const mapped = FLAVOR_MAP[key];
   if (!mapped) return { ...DEFAULT_FLAVOR, key: flavorKey };
 
-  let merged: FlavorInfo = {
+  const merged: FlavorInfo = {
     ...DEFAULT_FLAVOR,
     ...mapped,
     key: flavorKey,

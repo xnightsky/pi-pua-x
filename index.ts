@@ -20,7 +20,6 @@ import {
   buildBehaviorProtocol,
   findSkillDirs,
   getReferencesDir,
-  type FlavorInfo,
 } from "./references_loader.js";
 import {
   buildCapabilityEnhancementPrompt,
@@ -36,7 +35,6 @@ import {
   buildCompactStateMarkdown,
   analyzeTurn,
   resolveEnforcementConfig,
-  type EnforcementConfig,
 } from "./enforcement.js";
 
 /** PUA 扩展的运行时状态 */
@@ -221,7 +219,7 @@ export default function (pi: ExtensionAPI) {
   /** 命令历史记录器（用于重复检测） */
   const commandHistory = new CommandHistory(5);
   /** 最近失败的工具命令摘要（用于 compact state save） */
-  let recentFailures: string[] = [];
+  const recentFailures: string[] = [];
   /** advisory 通知冷却记录：target → 上次通知时间戳 */
   const advisoryCooldown: Map<string, number> = new Map();
   /** advisory 冷却时间（毫秒） */
