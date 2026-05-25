@@ -6,8 +6,8 @@
 set -euo pipefail
 
 REPO_RAW="https://raw.githubusercontent.com/tanweai/pua/main/skills/pua/references"
-# 嗅探 skill 目录（按优先级）
-for dir in "${HOME}/.codex/skills/pua" "${HOME}/.claude/skills/pua" "${HOME}/.agents/skills/pua"; do
+# 嗅探 skill 目录（按优先级：通用 agents 目录优先，legacy CLI 目录兼容）
+for dir in "${HOME}/.agents/skills/pua" "${HOME}/.claude/skills/pua" "${HOME}/.codex/skills/pua"; do
   if [ -d "${dir}" ] || [ "${dir}" = "${HOME}/.agents/skills/pua" ]; then
     SKILL_DIR="${dir}"
     break

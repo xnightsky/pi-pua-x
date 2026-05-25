@@ -9,10 +9,11 @@ $HomeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
 
 # ── 嗅探 skill 目录（按优先级） ──
 $SkillDir = $null
+# 通用 agents 目录优先，legacy CLI 目录兼容
 foreach ($dir in @(
-    (Join-Path $HomeDir ".codex/skills/pua"),
+    (Join-Path $HomeDir ".agents/skills/pua"),
     (Join-Path $HomeDir ".claude/skills/pua"),
-    (Join-Path $HomeDir ".agents/skills/pua")
+    (Join-Path $HomeDir ".codex/skills/pua")
 )) {
     if (Test-Path $dir) {
         $SkillDir = $dir
