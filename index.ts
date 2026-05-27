@@ -39,6 +39,22 @@ import {
   type EnforcementConfig,
 } from "./enforcement.js";
 
+// ═══════════════════════════════════════════════════════════════
+// 工具分层（失败检测用）
+// ═══════════════════════════════════════════════════════════════
+
+/** 执行层工具：shell 命令执行，失败/成功都参与计数 */
+const EXECUTION_TIER_TOOLS = new Set(["bash", "powershell", "shell", "pwsh-start-job"]);
+
+/** 写入层工具：代码修改，有条件参与计数 */
+const WRITE_TIER_TOOLS = new Set(["edit", "write"]);
+
+/**
+ * edit 工具的 oldText 匹配失败不计入压力（常规重试，不代表 agent 卡住）。
+ * 只有真正的写入失败（权限、路径不存在等）才计入。
+ */
+const EDIT_BENIGN_PATTERNS = /could not find|oldText must match|not found in|no match/i;
+
 /** PUA 扩展的运行时状态 */
 interface PuaState {
   /** 当前是否启用 PUA 注入 */
@@ -182,13 +198,40 @@ function isFailure(event: any): boolean {
   if (event.isError) return true;
   const details = event.details;
   if (details) {
-    const exitCode = details.exitCode ?? 0;
+    // 兼容上游官方 PI 扩展的多字段兆底
+    const exitCode = details.exitCode ?? event.exitCode ?? event.exit_code ?? 0;
     if (typeof exitCode === "number" && exitCode !== 0) return true;
-    const stderr = details.stderr ?? "";
+    const stderr = details.stderr ?? event.stderr ?? "";
     const patterns = [/error/i, /failed/i, /fatal/i, /exception/i, /cannot find/i, /not found/i, /permission denied/i, /connection refused/i];
     if (typeof stderr === "string" && stderr.length > 0 && patterns.some((p) => p.test(stderr))) return true;
   }
   return false;
+}
+
+/**
+ * 判断写入层工具的失败是否应计入压力。
+ * edit 工具的 oldText 匹配失败是常规重试，不计入。
+ *
+ * @param event - tool_result 事件
+ * @returns 是否应计入压力计数
+ */
+function isWriteTierFailure(event: any): boolean {
+  if (!event.isError) return false;
+  // 提取错误信息文本
+  const errorText = event.content ?? event.details?.message ?? event.message ?? "";
+  const textStr = typeof errorText === "string" ? errorText : JSON.stringify(errorText);
+  // edit 的 oldText 匹配失败不计入
+  if (EDIT_BENIGN_PATTERNS.test(textStr)) return false;
+  return true;
+}
+
+/**
+ * 判断工具结果是否属于“可观测层”（执行层 + 写入层）。
+ * 只有可观测层的结果才参与失败计数和成功清零。
+ */
+function isObservableTier(toolName: string): boolean {
+  const name = (toolName ?? "").toLowerCase();
+  return EXECUTION_TIER_TOOLS.has(name) || WRITE_TIER_TOOLS.has(name);
 }
 
 /**
@@ -383,19 +426,41 @@ export default function (pi: ExtensionAPI) {
   // ═══════════════════════════════════════════════════════════════
 
   /**
-   * 监听 tool_result 事件，识别执行失败并累加失败计数，
-   * 或在连续成功时自动清零。
+   * 监听 tool_result 事件，分层识别工具失败并累加失败计数。
    *
-   * 为避免高频抖动，3 秒内同一批连续失败只计一次。
+   * 分层策略：
+   * - 执行层（bash/powershell/shell/pwsh-start-job）：失败 +1，成功清零
+   * - 写入层（edit/write）：仅真正失败时 +1（排除 oldText 匹配错误），成功清零
+   * - 探索层（read/search/fetch 等）：完全透明，不参与计数也不清零
+   *
+   * 去抖动：相同命令骨架 3 秒内只计一次。
    */
   pi.on("tool_result", async (event, ctx) => {
     if (!state.enabled) return;
 
-    const isErr = isFailure(event);
+    const toolName = (event.toolName ?? event.tool_name ?? "").toLowerCase();
+
+    // 探索层工具：完全透明，不参与计数也不清零
+    if (!isObservableTier(toolName)) return;
+
+    // 判断是否失败
+    const isExecTier = EXECUTION_TIER_TOOLS.has(toolName);
+    const isWriteTier = WRITE_TIER_TOOLS.has(toolName);
+    let isErr = false;
+
+    if (isExecTier) {
+      isErr = isFailure(event);
+    } else if (isWriteTier) {
+      isErr = isWriteTierFailure(event);
+    }
+
     if (isErr) {
       const now = Date.now();
-      // 3 秒内同一批连续失败只计一次，避免抖动
-      if (now - state.lastFailureTs < 3000) return;
+      // 相同命令骨架 3 秒内只计一次，避免重试报错抬高计数
+      if (isExecTier && now - state.lastFailureTs < 3000) {
+        const cmd = event.input?.command ?? "";
+        if (cmd && commandHistory.isRepetitive(cmd)) return;
+      }
 
       state.failureCount++;
       state.lastFailureTs = now;
@@ -406,7 +471,7 @@ export default function (pi: ExtensionAPI) {
         ctx.ui.notify(`PUA 压力升级: L${level}（失败 ${state.failureCount} 次）`, level >= 3 ? "error" : "warning");
       }
     } else {
-      // 一次成功即清零，体现“流程优先于个人英雄”的快速恢复机制。
+      // 可观测层工具成功清零：连续失败链已断
       if (state.failureCount > 0) {
         state.failureCount = 0;
         state.lastInjectedLevel = 0;
@@ -580,14 +645,8 @@ export default function (pi: ExtensionAPI) {
 
     const analysis = analyzeTurn(assistantText, toolResults, commandHistory);
 
-    if (analysis.unverifiedCompletion) {
-      state.failureCount++;
-      persistState();
-      ctx.ui.notify(
-        `[PUA] 检测到空口完成：声称完成但本轮无验证证据。失败计数 +1（当前 ${state.failureCount}）`,
-        "warning"
-      );
-    }
+    // 空口完成检测已移除：与上游一致，纯靠协议文本约束。
+    // 运行时关键词匹配误触发率高且边际收益不足（见 docs/DESIGN.md）。
 
     if (analysis.loopDetected && enforcementConfig.loop_detection) {
       ctx.ui.notify(
