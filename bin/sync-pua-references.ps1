@@ -58,7 +58,9 @@ $UpstreamFiles = @(
     "methodology-tencent.md"
     "methodology-tesla.md"
     "methodology-xiaomi.md"
+    "methodology-microsoft.md"
     "display-protocol.md"
+    "harness-governance.md"
     "agent-team.md"
     "evolution-protocol.md"
     "p7-protocol.md"
@@ -68,6 +70,7 @@ $UpstreamFiles = @(
     "survey.md"
     "teardown-protocol.md"
 )
+# 注：harness-governance.md 和 methodology-microsoft.md 于 2026-05 从上游补齐
 
 # ── 本地扩展文件（不同步，由本扩展自行维护） ──
 $LocalFiles = @("pressure-prompts.md")
