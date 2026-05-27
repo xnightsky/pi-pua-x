@@ -1,17 +1,66 @@
 # PUA Extension 集成测试脚本（PowerShell，消耗真实 AI token）
-# 用法：. $env:USERPROFILE/.pi/agent/extensions/pua/pua.ittest.ps1
-# 或者：powershell -ExecutionPolicy Bypass -File ~/.pi/agent/extensions/pua/pua.ittest.ps1
+# 用法：
+#   pwsh -File pua.ittest.ps1                          # 默认用 deepseek-v4-flash
+#   pwsh -File pua.ittest.ps1 -Model kimi-coding/kimi-for-coding
+#   pwsh -File pua.ittest.ps1 -Model deepseek/deepseek-v4-flash
+#   pwsh -File pua.ittest.ps1 -Provider deepseek -Model deepseek-v4-flash
+#
+# 参数：
+#   -Model    模型 ID（支持 provider/model 格式，不传则用默认测试模型）
+#   -Provider 渠道名（不传则从 Model 中解析或用默认）
+param(
+    [string]$Model = "",
+    [string]$Provider = ""
+)
 
 # 兼容 Windows PowerShell 5.x 与 PowerShell 7.x
 $ErrorActionPreference = "Stop"
 
+# 默认测试模型：便宜、快速、足够完成简单工具调用指令
+$DefaultTestModel = "deepseek/deepseek-v4-flash"
+
+# 解析模型参数：支持 provider/model 格式
+if (-not $Model) {
+    $Model = $DefaultTestModel
+}
+if ($Model -match '^([^/]+)/(.+)$' -and -not $Provider) {
+    $Provider = $Matches[1]
+    $Model = $Matches[2]
+}
+
+# 构建 pi 命令的模型参数
+$PiModelArgs = @()
+if ($Provider) { $PiModelArgs += "--provider"; $PiModelArgs += $Provider }
+if ($Model)    { $PiModelArgs += "--model";    $PiModelArgs += $Model }
+
 # 路径常量
 $HomeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
 $ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-$Ext = Join-Path $ScriptDir "index.ts"
+$Ext = Join-Path $ScriptDir "..\index.ts"
 $PuaDir = Join-Path $HomeDir ".pua"
 $PiState = Join-Path $HomeDir ".pi/agent/pua-state.json"
 $Failed = 0
+
+# 扩展隔离策略：
+# --no-extensions 禁用全局发现（避免与全局安装的 pi-pua-x 冲突）
+# -e $Ext 显式加载本地开发版扩展
+# 需要外部工具的场景额外加载对应扩展
+$PiBaseArgs = @("--no-extensions", "-e", $Ext)
+
+# 动态发现外部扩展路径（用于显式加载）
+$PiAgentDir = Join-Path $HomeDir ".pi/agent"
+$PowerShellExtPath = Join-Path $PiAgentDir "npm/node_modules/@marcfargas/pi-powershell/src/index.ts"
+$PiPsArgs = @()
+if (Test-Path $PowerShellExtPath) {
+    $PiPsArgs = @("-e", $PowerShellExtPath)
+}
+
+# 显示测试配置
+$ModelDisplay = if ($Provider) { "$Provider/$Model" } else { $Model }
+Write-Host "═══ PUA Integration Test ═══"
+Write-Host "Model: $ModelDisplay"
+Write-Host "Extension: $Ext"
+Write-Host ""
 
 function Info($msg) { Write-Host "[TEST] $msg" }
 function Ok($msg)   { Write-Host "[PASS] $msg" -ForegroundColor Green }
@@ -47,7 +96,7 @@ if (-not $PiCmd) {
 
 # PUA 开发集成测试依赖这些外部 PI package。
 $PiListText = (& pi list 2>&1 | Out-String)
-$HasPowerShellTool = HasPiPackage $PiListText @("npm:@marcfargas/pi-powershell")
+$HasPowerShellTool = (Test-Path $PowerShellExtPath)
 $RequiredPackageGroups = @(
     @{ Label = "web access"; Packages = @("npm:pi-web-access"); Install = "pi install npm:pi-web-access" },
     @{ Label = "MCP adapter"; Packages = @("npm:pi-mcp-adapter"); Install = "pi install npm:pi-mcp-adapter" },
@@ -73,7 +122,7 @@ if ($Failed -gt 0) {
 # 场景 1：基本加载
 Info "scenario 1: basic load"
 try {
-    $null = & pi -p -e $Ext --no-prompt-templates --no-context-files "echo hello" 2>$null
+    $null = & pi -p @PiBaseArgs @PiModelArgs --no-prompt-templates --no-context-files "echo hello" 2>$null
     Ok "basic load"
 } catch {
     Fail "basic load"
@@ -86,7 +135,7 @@ $null = New-Item -ItemType Directory -Path $PuaDir -Force
 @{ always_on = $true } | ConvertTo-Json -Depth 10 | Set-Content -Path (Join-Path $PuaDir "config.json") -Encoding UTF8
 
 try {
-    $null = & pi -p -e $Ext --no-prompt-templates --no-context-files "echo hello" 2>$null
+    $null = & pi -p @PiBaseArgs @PiModelArgs --no-prompt-templates --no-context-files "echo hello" 2>$null
     Ok "always_on activation"
 } catch {
     Fail "always_on activation - extension error"
@@ -101,7 +150,7 @@ if ($HasPowerShellTool) {
 
     try {
         # 强制走真实失败 tool_result，避免模型只在文本里描述失败而不触发扩展计数。
-        $null = & pi -p -e $Ext --tools powershell --no-prompt-templates --no-context-files "Use the powershell tool exactly once to run: throw 'pua_itest_failure_12345'. Do not run any other command. Then stop." 2>$null
+        $null = & pi -p @PiBaseArgs @PiPsArgs @PiModelArgs --tools powershell --no-prompt-templates --no-context-files "Use the powershell tool exactly once to run: throw 'pua_itest_failure_12345'. Do not run any other command. Then stop." 2>$null
     } catch { }
 
     $CountFile = Join-Path $PuaDir ".failure_count"
@@ -123,7 +172,7 @@ if ($HasPowerShellTool) {
     foreach ($i in 1..3) {
         try {
             # 下方 sleep 让每次失败越过扩展的 3 秒防抖窗口，确保验证连续升级。
-            $null = & pi -p -e $Ext --tools powershell --no-prompt-templates --no-context-files "Use the powershell tool exactly once to run: throw 'pua_itest_failure_$i'. Do not run any other command. Then stop." 2>$null
+            $null = & pi -p @PiBaseArgs @PiPsArgs @PiModelArgs --tools powershell --no-prompt-templates --no-context-files "Use the powershell tool exactly once to run: throw 'pua_itest_failure_$i'. Do not run any other command. Then stop." 2>$null
         } catch { }
         Start-Sleep -Seconds 1
     }
@@ -140,7 +189,7 @@ if ($HasPowerShellTool) {
     # 场景 5：成功清零
     Info "scenario 5: success reset"
     try {
-        $null = & pi -p -e $Ext --tools powershell --no-prompt-templates --no-context-files "Use the powershell tool exactly once to run: Write-Output ok. Do not run any other command. If it succeeds, reply exactly DONE." 2>$null
+        $null = & pi -p @PiBaseArgs @PiPsArgs @PiModelArgs --tools powershell --no-prompt-templates --no-context-files "Use the powershell tool exactly once to run: Write-Output ok. Do not run any other command. If it succeeds, reply exactly DONE." 2>$null
     } catch { }
 
     $Count = if (Test-Path $CountFile) { (Get-Content $CountFile -Raw).Trim() } else { "0" }
@@ -153,12 +202,52 @@ if ($HasPowerShellTool) {
     Skip "scenario 3-5: 未安装 @marcfargas/pi-powershell，跳过 Windows PowerShell tool_result 验证"
 }
 
+# 场景 5a：探索层工具失败不计入压力（不依赖 powershell 工具）
+Info "scenario 5a: exploration tier failure does not increment counter"
+Cleanup
+$null = New-Item -ItemType Directory -Path $PuaDir -Force
+@{ always_on = $true } | ConvertTo-Json -Depth 10 | Set-Content -Path (Join-Path $PuaDir "config.json") -Encoding UTF8
+$CountFile = Join-Path $PuaDir ".failure_count"
+
+try {
+    # read 一个不存在的文件，应不触发压力计数
+    $null = & pi -p @PiBaseArgs @PiModelArgs --tools read --no-prompt-templates --no-context-files "Use the read tool to read /tmp/pua_nonexistent_file_xyz_999.txt and report what you see." 2>$null
+} catch { }
+
+$Count = if (Test-Path $CountFile) { (Get-Content $CountFile -Raw).Trim() } else { "0" }
+if ($Count -eq "0") {
+    Ok "exploration tier failure not counted"
+} else {
+    Fail "exploration tier failure not counted - expected 0, got $Count"
+}
+
+# 场景 5b：探索层工具成功不清零已有计数
+Info "scenario 5b: exploration tier success does not reset counter"
+Cleanup
+$null = New-Item -ItemType Directory -Path $PuaDir -Force
+@{ always_on = $true } | ConvertTo-Json -Depth 10 | Set-Content -Path (Join-Path $PuaDir "config.json") -Encoding UTF8
+$CountFile = Join-Path $PuaDir ".failure_count"
+# 预设失败计数为 2
+Set-Content -Path $CountFile -Value "2" -Encoding UTF8
+
+try {
+    # read 一个存在的文件，成功不应清零计数
+    $null = & pi -p @PiBaseArgs @PiModelArgs --tools read --no-prompt-templates --no-context-files "Use the read tool to read package.json and show the first 3 lines." 2>$null
+} catch { }
+
+$Count = if (Test-Path $CountFile) { (Get-Content $CountFile -Raw).Trim() } else { "0" }
+if ([int]$Count -ge 2) {
+    Ok "exploration tier success did not reset counter (count=$Count)"
+} else {
+    Fail "exploration tier success reset counter - expected >=2, got $Count"
+}
+
 # 场景 6：on/off 持久化
 Info "scenario 6: on/off persistence"
 $ConfigPath = Join-Path $PuaDir "config.json"
 @{ always_on = $false } | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigPath -Encoding UTF8
 try {
-    $null = & pi -p -e $Ext --no-prompt-templates --no-context-files "echo off" 2>$null
+    $null = & pi -p @PiBaseArgs @PiModelArgs --no-prompt-templates --no-context-files "echo off" 2>$null
 } catch { }
 $Config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
 # JSON true/false 在 PowerShell 反序列化后会变成 $true/$false。
@@ -170,7 +259,7 @@ if ($Config.always_on -eq $false) {
 
 @{ always_on = $true } | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigPath -Encoding UTF8
 try {
-    $null = & pi -p -e $Ext --no-prompt-templates --no-context-files "echo on" 2>$null
+    $null = & pi -p @PiBaseArgs @PiModelArgs --no-prompt-templates --no-context-files "echo on" 2>$null
 } catch { }
 
 $Config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
@@ -187,7 +276,7 @@ $null = New-Item -ItemType Directory -Path $PuaDir -Force
 @{ always_on = $true; flavor = "huawei" } | ConvertTo-Json -Depth 10 | Set-Content -Path (Join-Path $PuaDir "config.json") -Encoding UTF8
 
 try {
-    $null = & pi -p -e $Ext --no-prompt-templates --no-context-files "echo test" 2>$null
+    $null = & pi -p @PiBaseArgs @PiModelArgs --no-prompt-templates --no-context-files "echo test" 2>$null
     Ok "flavor switching"
 } catch {
     Fail "flavor switching"
@@ -198,7 +287,7 @@ Info "scenario 8: missing skill guard"
 $TmpFile = New-TemporaryFile
 $TmpPath = $TmpFile.FullName
 try {
-    $null = & pi -p -e $Ext --no-skills --no-prompt-templates --no-context-files "echo test" *> $TmpPath
+    $null = & pi -p @PiBaseArgs @PiModelArgs --no-skills --no-prompt-templates --no-context-files "echo test" *> $TmpPath
 } catch { }
 
 $Output = Get-Content $TmpPath -Raw
@@ -216,7 +305,7 @@ $TmpPath = $TmpFile.FullName
 @{ always_on = $true } | ConvertTo-Json -Depth 10 | Set-Content -Path (Join-Path $PuaDir "config.json") -Encoding UTF8
 try {
     # 只暴露 read/write 时，能力快照只应出现在状态命令中，不应注入旧的缺失工具 prompt。
-    $null = & pi -p -e $Ext --tools read,write --no-prompt-templates --no-context-files "/pua-status" *> $TmpPath
+    $null = & pi -p @PiBaseArgs @PiModelArgs --tools read,write --no-prompt-templates --no-context-files "/pua-status" *> $TmpPath
 } catch { }
 
 $Output = Get-Content $TmpPath -Raw
