@@ -2,16 +2,31 @@
   "name": "pi-pua-x",
   "version": "0.1.0",
   "description": "Stateful PUA runtime extension for pi — lifecycle hooks, pressure escalation, capability-aware enhancement, and subagent inheritance",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "license": "MIT",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "check": "for f in *.ts; do case \"$f\" in *.d.ts) continue;; esac; node --experimental-strip-types --check \"$f\"; done && node --check capabilities.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/xnightsky/pi-pua-x.git"
   },
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": [
+      "./index.ts"
+    ]
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.4"
   }
 }
