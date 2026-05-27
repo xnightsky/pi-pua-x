@@ -178,13 +178,13 @@ function collectPaths(toolName: string, input: any): string[] {
   }
   if (toolName === "bash" && typeof input.command === "string") {
     // 从 bash 命令中提取路径片段（含 /）
-    const multiSegment = input.command.match(/[A-Za-z0-9_.@+~:\/-]+(?:\/[A-Za-z0-9_.@+~:\/-]+)+/g);
+    const multiSegment = input.command.match(/[A-Za-z0-9_.@+~:/-]+(?:\/[A-Za-z0-9_.@+~:/-]+)+/g);
     if (multiSegment) paths.push(...multiSegment);
     // 提取单文件名（如 .env.local、secrets.json）
     const tokens = input.command.split(/[\s;&|><]+/);
     for (const t of tokens) {
       const cleaned = t.replace(/^["']+|["']+$/g, "");
-      if (cleaned && /^[.]?[A-Za-z_][A-Za-z0-9_.\-]*$/.test(cleaned)) {
+      if (cleaned && /^[.]?[A-Za-z_][A-Za-z0-9_.-]*$/.test(cleaned)) {
         paths.push(cleaned);
       }
     }

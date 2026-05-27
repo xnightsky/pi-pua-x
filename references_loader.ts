@@ -60,11 +60,14 @@ const SKILL_NAME = "pua";
 export function findSkillDirs(): string[] {
   const home = homedir();
   const candidates = [
-    join(home, ".codex", "skills", SKILL_NAME),
-    join(home, ".pi", "agent", "skills", SKILL_NAME),
+    // 通用 agents 目录优先
     join(home, ".agents", "skills", SKILL_NAME),
-    join(process.cwd(), ".pi", "skills", SKILL_NAME),
+    join(home, ".pi", "agent", "skills", SKILL_NAME),
+    // legacy CLI 目录兼容
+    join(home, ".codex", "skills", SKILL_NAME),
+    // 项目级目录
     join(process.cwd(), ".agents", "skills", SKILL_NAME),
+    join(process.cwd(), ".pi", "skills", SKILL_NAME),
   ];
   return candidates.filter((d) => existsSync(join(d, "SKILL.md")));
 }
@@ -183,7 +186,7 @@ export function loadFlavorInfo(flavorKey: string): FlavorInfo {
   const mapped = FLAVOR_MAP[key];
   if (!mapped) return { ...DEFAULT_FLAVOR, key: flavorKey };
 
-  let merged: FlavorInfo = {
+  const merged: FlavorInfo = {
     ...DEFAULT_FLAVOR,
     ...mapped,
     key: flavorKey,

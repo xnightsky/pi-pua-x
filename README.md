@@ -1,5 +1,7 @@
 # pi-pua-x
 
+> English | [中文版本](./README.zh.md)
+
 Stateful PUA runtime extension for [pi](https://github.com/nicepkg/pi-coding-agent) — lifecycle hooks, pressure escalation, capability-aware enhancement, and subagent inheritance. Built on [tanweai/pua](https://github.com/tanweai/pua).
 
 ## What is this?
@@ -35,10 +37,10 @@ See [INSTALL.md](./INSTALL.md) for full instructions.
 Quick start:
 
 ```bash
-# 推荐：通过 pi install
+# Recommended: install via pi
 pi install git:github.com/xnightsky/pi-pua-x
 
-# 或手动复制（local cp）
+# Or copy manually
 mkdir -p ~/.pi/agent/extensions/pua
 cp -R ./* ~/.pi/agent/extensions/pua/
 ```
