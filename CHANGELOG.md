@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.2.1
+
+### Fixed
+
+- **`/pua-x-sync-skills` TUI 卡死**：`execFileSync` 改为异步 `spawn`，脚本执行期间 TUI 保持响应、有进度回执。
+- **skill 探测兼容 symlink + references-only**：`findSkillDirs` 判定条件从仅 `SKILL.md` 放宽为 `SKILL.md` 或 `references/` 任一存在即有效，兼容用户通过 symlink 或仅 sync references 的部署方式。
+- **安装引导路径修正**："pua skill 未找到"提示的推荐路径改为首选 `~/.agents/skills/pua/`（与 sync 脚本落盘目录一致），保留 `~/.pi/agent/skills/pua/` 作为备选。
+
+### Added
+
+- **INSTALL.md 方式三：开发调试**：独立章节，`pi -ne -e ./index.ts` 直指仓库源码，改完重启即生效。速查表同步更新。
+- **README 「两个模块」高亮说明**：在 README.md / README.zh.md / INSTALL.md 三处加醒目 blockquote，讲清 skill（静态规则）vs hooks（本扩展）的分工边界，消除"装了扩展为何还要 sync skill"的困惑。
+- `/pua-x-sync-skills` handler 补完整架构注释（模块关系、流程、设计决策）。
+
 ## v0.2.0
 
 ### Added
