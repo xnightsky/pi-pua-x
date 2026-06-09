@@ -76,7 +76,13 @@ export function findSkillDirs(): string[] {
     join(process.cwd(), ".agents", "skills", SKILL_NAME),
     join(process.cwd(), ".pi", "skills", SKILL_NAME),
   ];
-  return candidates.filter((d) => existsSync(join(d, "SKILL.md")));
+  // 判定条件：SKILL.md 或 references/ 任一存在即视为有效 skill 目录。
+  // 有些用户只 sync 了 references 而未拷贝 SKILL.md（上游两者并列），
+  // 且目录可能是 symlink（pi 自身支持 symlink 加载 skill），
+  // existsSync 会自动 follow symlink。
+  return candidates.filter((d) =>
+    existsSync(join(d, "SKILL.md")) || existsSync(join(d, "references")),
+  );
 }
 
 /**

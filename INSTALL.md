@@ -18,6 +18,7 @@
   - [更新](#更新-1)
   - [卸载](#卸载-1)
   - [重装](#重装)
+- [方式三：开发调试（pi -e 直指源码）](#方式三开发调试pi--e-直指源码推荐)
 - [验证安装](#验证安装)
 - [PUA 开发基线插件](#pua-开发基线插件)
 - [命令](#命令)
@@ -33,7 +34,16 @@
 
 1. **pi 已安装** — 本扩展是 pi 的插件，需先安装 [pi](https://github.com/nicepkg/pi-coding-agent)。
 2. **Node.js ≥ 18** — pi 运行依赖 Node.js，建议用最新 LTS 版本。
-3. **tanweai/pua skill（可选但推荐）** — PUA 行为协议的核心规则文件。扩展本身有内置 fallback，但完整体验需要 skill 的 references/ 目录（flavors、methodology 等）。
+3. **tanweai/pua skill（前置依赖，强烈推荐）** — PUA 行为协议的核心规则文件。扩展本身有内置 fallback，但完整体验需要 skill 的 references/ 目录（flavors、methodology 等）。
+
+> ### ⚠️ 为什么装了本扩展还要单独装 skill？
+>
+> PUA 分**两个模块**，本扩展（`pi-pua-x`）**只替换 hooks，不含 skill**：
+>
+> - **skill 模块** = 静态规则文件（`SKILL.md` + `references/`），模型*读*它获取 flavor/methodology 内容。由上游 [`tanweai/pua`](https://github.com/tanweai/pua) 维护，本扩展**不打包**。
+> - **hooks 模块** = 程序化运行时（生命周期钩子、失败计数、压力升级、强制执行）。官方只把 hooks 作为 pi 适配器维护，`pi-pua-x` 是其增强替代版。
+>
+> 所以 `pi install` / 手动复制只装好了 **hooks** 那一半；**skill** 那一半（模型真正读的规则文本）必须另外从 `tanweai/pua` 部署。缺了 skill，hooks 照跑但模型无规则内容可依据，扩展会回退到内置最小集；若完全找不到 skill，会在会话开始时自动禁用 PUA 并输出安装指引。
 
 > Windows 用户请确保 PowerShell 执行策略允许运行脚本（`RemoteSigned` 或 `Bypass`）。
 
@@ -62,7 +72,7 @@ mkdir -p ~/.pi/agent/skills/pua/references
 | 场景 | 推荐方式 | 一句话 |
 |------|---------|--------|
 | 普通用户，只想用 | `pi install` | 一行命令，自动管理版本 |
-| 开发者，改源码调试 | 手动 `cp` | 直接复制当前目录到扩展路径 |
+| 开发者，改源码调试 | `pi -e`（方式三） | 直指仓库源码，改完重启即生效，不写配置 |
 | 团队项目，共享配置 | `pi install -l` | 项目级安装，写入 `.pi/settings.json` |
 | 临时试用，不想留痕 | `pi -e` | 单次会话加载，不写配置 |
 
@@ -240,6 +250,64 @@ rm -rf ~/.pi/agent/extensions/pua
 mkdir -p ~/.pi/agent/extensions/pua
 cp -R ./* ~/.pi/agent/extensions/pua/
 ```
+
+---
+
+## 方式三：开发调试（`pi -e` 直指源码，推荐）
+
+如果你在**反复改源码、随改随看效果**，不要用方式一/二——那两种每改一次都要重新 `install` 或 `cp`，费劲且容易跟旧文件混。
+
+`pi -e <path>` 直接加载仓库里的 `index.ts`，**不复制、不写配置**；改完源码只需重启 pi 即生效。
+
+### 启动调试会话
+
+在**仓库根目录**执行：
+
+**Linux / macOS (bash)**
+```bash
+cd /path/to/pi-pua-x      # 你的仓库目录
+pi -ne -e ./index.ts
+```
+
+**Windows (PowerShell)**
+```powershell
+cd C:\path\to\pi-pua-x
+pi -ne -e .\index.ts
+```
+
+两个关键 flag：
+
+| flag | 作用 |
+|------|------|
+| `-e ./index.ts` | 加载指定扩展文件（可多次传入多个） |
+| `-ne` | 禁用全局扩展发现（显式 `-e` 仍生效）。**调试时必加**，否则会与已安装的正式版同时加载，造成命令/钩子重复冲突 |
+
+> ⚠️ **为什么必须加 `-ne`**：若你之前用方式一/二装过正式版（在 `~/.pi/agent/git/.../pi-pua-x/` 或 `~/.pi/agent/extensions/pua/`），pi 启动时会自动发现它。不加 `-ne` 就会和 `-e` 加载的调试版**双重加载**，出现重复命令注册报错。`-ne` 只屏蔽自动发现，你显式 `-e` 指定的仓库源码照常加载。
+
+### 调试闭环
+
+```bash
+# 1. 改源码后先跑语法验证（不启 pi 也能提前报错）
+node --experimental-strip-types --check index.ts
+
+# 2. 重启调试会话看效果
+pi -ne -e ./index.ts
+
+# 3. 会话内验证扩展加载成功
+/pua-status
+```
+
+需同时调试多个扩展时，`-e` 可重复：
+
+```bash
+pi -ne -e ./index.ts -e /path/to/other-ext/index.ts
+```
+
+### 调试与正式安装的关系
+
+- 调试加载（`-e`）**不写入** `settings.json`，退出 pi 即消失，零残留。
+- 调试阶段无需卸载正式版，`-ne` 已将其隔离；只有你想让改动“转正式”时，才用方式一的 `pi update` 或方式二的重装流程落盘。
+- skill 模块（`tanweai/pua`）与调试无关，不受 `-ne` 影响；skill 是独立的 references 文件，按「前置条件」部署后调试会话也能读到。
 
 ---
 
