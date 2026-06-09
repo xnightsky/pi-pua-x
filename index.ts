@@ -14,7 +14,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
   loadFlavorInfo,
   loadPressurePrompts,
@@ -448,7 +448,20 @@ export default function (pi: ExtensionAPI) {
     return null;
   }
 
-  /** /pua-x-sync-skills：一键同步 tanweai/pua 上游 references。 */
+  /**
+   * /pua-x-sync-skills：一键同步 tanweai/pua 上游 references。
+   *
+   * 架构理解：
+   * - PUA 分两个模块：skill（静态规则文件）+ hooks（本扩展，程序化运行时）。
+   * - 本扩展只提供 hooks，skill 由上游 tanweai/pua 维护。
+   * - 此命令负责拉取 skill 模块的 references/（flavors、methodology 等）到本地。
+   *
+   * 流程：
+   * 1. 通过 findSyncScript() 定位同步脚本（先 pi install 路径、后手动安装路径）
+   * 2. 用异步 spawn 启动 bash/powershell 执行脚本（不阻塞 TUI）
+   * 3. 脚本默认将 references 下载到 ~/.agents/skills/pua/references/
+   * 4. 完成/失败通过 ctx.ui.notify 回执用户
+   */
   pi.registerCommand("pua-x-sync-skills", {
     description: "同步 tanweai/pua 上游 references（flavors、methodology 等）",
     handler: async (_args, ctx) => {
@@ -463,27 +476,71 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
+      // 解析执行器：决定用哪个解释器跑哪个脚本。
+      // 关键：必须用异步 spawn，不能用 execFileSync。
+      // execFileSync 会同步阻塞 Node 事件循环，而 pi 的 TUI 渲染依赖该循环；
+      // 脚本要 curl 下载 ~28 个文件（每个最长 20s 超时 + 代理嗅探），
+      // 同步阻塞会让整个 TUI 冻死数十秒且无任何输出。
       const isWin = process.platform === "win32";
-      try {
-        if (isWin && scripts.ps1) {
-          execFileSync("powershell.exe", ["-ExecutionPolicy", "Bypass", "-File", scripts.ps1], {
-            stdio: "pipe",
-            encoding: "utf-8",
-          });
-        } else if (scripts.sh) {
-          execFileSync("bash", [scripts.sh], { stdio: "pipe", encoding: "utf-8" });
-        } else if (scripts.ps1) {
-          // 非 Windows 但无 bash，尝试 PowerShell（如通过 pwsh）
-          execFileSync("pwsh", ["-File", scripts.ps1], { stdio: "pipe", encoding: "utf-8" });
-        } else {
-          ctx.ui.notify("[PUA-X SYNC] 当前平台无可用同步脚本。", "warning");
+      let cmd: string;
+      let cmdArgs: string[];
+      if (isWin && scripts.ps1) {
+        cmd = "powershell.exe";
+        cmdArgs = ["-ExecutionPolicy", "Bypass", "-File", scripts.ps1];
+      } else if (scripts.sh) {
+        cmd = "bash";
+        cmdArgs = [scripts.sh];
+      } else if (scripts.ps1) {
+        // 非 Windows 但无 bash，尝试 PowerShell（如通过 pwsh）
+        cmd = "pwsh";
+        cmdArgs = ["-File", scripts.ps1];
+      } else {
+        ctx.ui.notify("[PUA-X SYNC] 当前平台无可用同步脚本。", "warning");
+        return;
+      }
+
+      ctx.ui.notify("[PUA-X SYNC] 开始同步上游 references（后台执行，不阻塞）…", "info");
+
+      // 异步 spawn + 流式输出：事件循环保持空闲，TUI 持续可响应。
+      // Promise 内部始终 resolve（不 reject），成功/失败统一通过 notify 告知用户。
+      await new Promise<void>((resolve) => {
+        let stdout = "";
+        let stderr = "";
+        let child: any;
+        try {
+        // stdin 关闭：脚本无交互输入，避免子进程等待 stdin
+          child = spawn(cmd, cmdArgs, { stdio: ["ignore", "pipe", "pipe"] });
+        } catch (e: any) {
+          ctx.ui.notify(`[PUA-X SYNC] 无法启动同步脚本: ${e.message || String(e)}`, "error");
+          resolve();
           return;
         }
-        ctx.ui.notify("[PUA-X SYNC] references 同步完成。重启 pi 生效。", "success");
-      } catch (e: any) {
-        const msg = e.stderr || e.message || String(e);
-        ctx.ui.notify(`[PUA-X SYNC] 同步失败:\n${msg}`, "error");
-      }
+
+        child.stdout?.on("data", (d: any) => { stdout += d.toString(); });
+        child.stderr?.on("data", (d: any) => { stderr += d.toString(); });
+
+        child.on("error", (e: any) => {
+          // spawn 本身失败（如解释器不存在）。用 resolve 而非 reject，
+          // 因为命令失败不应让上层 handler reject（导致 pi 未捕获报错）。
+          ctx.ui.notify(`[PUA-X SYNC] 执行出错: ${e.message || String(e)}`, "error");
+          resolve();
+        });
+
+        child.on("close", (code: number) => {
+          if (code === 0) {
+            // 末尾若干行作为进度回执，避免一次性刷屏。
+            const tail = stdout.trim().split("\n").slice(-6).join("\n");
+            ctx.ui.notify(
+              `[PUA-X SYNC] references 同步完成。重启 pi 生效。\n${tail}`,
+              "success",
+            );
+          } else {
+            const msg = (stderr || stdout || "").trim() || `退出码 ${code}`;
+            ctx.ui.notify(`[PUA-X SYNC] 同步失败（退出码 ${code}）:\n${msg}`, "error");
+          }
+          resolve();
+        });
+      });
     },
   });
 
@@ -751,9 +808,10 @@ export default function (pi: ExtensionAPI) {
         `[PUA Extension] pua skill 未找到，已自动禁用 PUA。\n\n` +
         `pua skill 是 tanweai/pua 的行为规则文件（flavors、methodology 等）。\n` +
         `安装方式（选一种）：\n` +
-        `  1. git clone https://github.com/tanweai/pua.git \u003c目录\u003e\n` +
-        `     然后复制 skills/pua/ 到 ~/.pi/agent/skills/pua/\n` +
-        `  2. 或直接从 tanweai/pua 下载 skills/pua/SKILL.md 和 references/ 到 ~/.pi/agent/skills/pua/\n\n` +
+        `  1. git clone https://github.com/tanweai/pua.git <目录>\n` +
+        `     然后复制 skills/pua/ 到 ~/.agents/skills/pua/\n` +
+        `  2. 或直接从 tanweai/pua 下载 skills/pua/SKILL.md 和 references/ 到 ~/.agents/skills/pua/\n\n` +
+        `也支持: ~/.pi/agent/skills/pua/（pi 专属目录）\n\n` +
         `安装完成后执行 /pua-on 重新启用。`,
         "warning",
       );
