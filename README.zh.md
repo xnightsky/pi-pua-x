@@ -32,18 +32,9 @@
 
 ## 安装
 
-完整说明请参见 [INSTALL.md](./INSTALL.md)。
-
-快速开始：
-
-```bash
-# 推荐：通过 pi install
-pi install git:github.com/xnightsky/pi-pua-x
-
-# 或手动复制（local cp）
-mkdir -p ~/.pi/agent/extensions/pua
-cp -R ./* ~/.pi/agent/extensions/pua/
-```
+> **所有安装方式、配置说明、命令参考、基线插件和故障排查，请参见 [INSTALL.md](./INSTALL.md)。**
+>
+> README 中不再重复安装步骤，避免文档双轨维护导致信息不一致。
 
 ## 命令
 
@@ -53,6 +44,7 @@ cp -R ./* ~/.pi/agent/extensions/pua/
 | `/pua-off` | 禁用 PUA（写入 `always_on=false`） |
 | `/pua-status` | 显示状态、失败计数、压力等级、风味、能力 |
 | `/pua-reset` | 将失败计数器重置为零 |
+| `/pua-x-sync-skills` | 同步上游 tanweai/pua references（flavors、methodologies 等） |
 
 ## 配置
 
@@ -104,9 +96,10 @@ pi-pua-x/
 │   ├── RECOMMENDATIONS.md
 │   ├── UPSTREAM.md
 │   └── plans/
-├── pua.ittest.sh            # 集成测试（bash）
-├── pua.ittest.ps1           # 集成测试（PowerShell）
-└── pua-enforcement.ittest.ps1
+└── integration-tests/
+    ├── pua.ittest.sh        # 集成测试（bash）
+    ├── pua.ittest.ps1       # 集成测试（PowerShell）
+    └── pua-enforcement.ittest.ps1
 ```
 
 ## 许可证

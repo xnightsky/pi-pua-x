@@ -32,18 +32,9 @@ The official pi adapter (~100 lines) does basic prompt injection and counting. T
 
 ## Install
 
-See [INSTALL.md](./INSTALL.md) for full instructions.
-
-Quick start:
-
-```bash
-# Recommended: install via pi
-pi install git:github.com/xnightsky/pi-pua-x
-
-# Or copy manually
-mkdir -p ~/.pi/agent/extensions/pua
-cp -R ./* ~/.pi/agent/extensions/pua/
-```
+> **所有安装方式、配置说明、命令参考、基线插件和故障排查，请参见 [INSTALL.md](./INSTALL.md)。**
+>
+> README 中不再重复安装步骤，避免文档双轨维护导致信息不一致。
 
 ## Commands
 
@@ -53,6 +44,7 @@ cp -R ./* ~/.pi/agent/extensions/pua/
 | `/pua-off` | Disable PUA (writes `always_on=false`) |
 | `/pua-status` | Show status, failure count, pressure level, flavor, capabilities |
 | `/pua-reset` | Reset failure counter to zero |
+| `/pua-x-sync-skills` | Sync upstream tanweai/pua references (flavors, methodologies, etc.) |
 
 ## Configuration
 
@@ -104,9 +96,10 @@ pi-pua-x/
 │   ├── RECOMMENDATIONS.md
 │   ├── UPSTREAM.md
 │   └── plans/
-├── pua.ittest.sh            # Integration test (bash)
-├── pua.ittest.ps1           # Integration test (PowerShell)
-└── pua-enforcement.ittest.ps1
+└── integration-tests/
+    ├── pua.ittest.sh        # Integration test (bash)
+    ├── pua.ittest.ps1       # Integration test (PowerShell)
+    └── pua-enforcement.ittest.ps1
 ```
 
 ## License

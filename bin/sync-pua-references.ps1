@@ -1,5 +1,10 @@
 # Sync PUA references from tanweai/pua original repo (PowerShell 版本)
-# Usage: . $env:USERPROFILE/.pi/agent/extensions/pua/bin/sync-pua-references.ps1
+#
+# 用法取决于扩展安装方式：
+#   手动安装: . $env:USERPROFILE/.pi/agent/extensions/pua/bin/sync-pua-references.ps1
+#   pi install: . $env:USERPROFILE/.pi/agent/git/github.com/xnightsky/pi-pua-x/bin/sync-pua-references.ps1
+#
+# 也可在 pi 中直接执行命令：/pua-x-sync-skills
 
 # 兼容 Windows PowerShell 5.x 与 PowerShell 7.x
 $ErrorActionPreference = "Stop"

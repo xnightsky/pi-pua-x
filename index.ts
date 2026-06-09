@@ -14,6 +14,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { execFileSync } from "node:child_process";
 import {
   loadFlavorInfo,
   loadPressurePrompts,
@@ -387,7 +388,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   /**
-   * /pua-status：展示开关状态、失败计数、压力等级、当前味道、配置文件路径、最后失败时间。
+   * /pua-status：展示开关状态、失败计数、压力等级、当前味道、配置文件路径、最后失败时间、skill 目录。
    */
   pi.registerCommand("pua-status", {
     description: "查看 PUA 当前状态",
@@ -400,8 +401,12 @@ export default function (pi: ExtensionAPI) {
       const skillStatus = hasPuaSkill() ? "已安装" : "未找到";
       const referencesSource = getReferencesDir() ? "skill references" : "fallback";
       const capabilityStatus = formatCapabilityStatus(capabilitySnapshot);
+      const skillDirs = findSkillDirs();
+      const skillDirLine = skillDirs.length > 0
+        ? `  ${skillDirs.join("\n  ")}`
+        : "  (未找到)";
       ctx.ui.notify(
-        `PUA 状态:\n- 开关: ${state.enabled ? "ON 🔥" : "OFF"}\n- 失败计数: ${state.failureCount}\n- 压力等级: ${levelText}\n- 味道: ${flavor}\n- pua skill: ${skillStatus}\n- references: ${referencesSource}\n- config: ${existsSync(PUA_CONFIG) ? PUA_CONFIG : "N/A"}\n- 最后失败: ${state.lastFailureTs ? new Date(state.lastFailureTs).toLocaleTimeString() : "N/A"}\n${capabilityStatus}`,
+        `PUA 状态:\n- 开关: ${state.enabled ? "ON 🔥" : "OFF"}\n- 失败计数: ${state.failureCount}\n- 压力等级: ${levelText}\n- 味道: ${flavor}\n- pua skill: ${skillStatus}\n- skill 目录:\n${skillDirLine}\n- references: ${referencesSource}\n- config: ${existsSync(PUA_CONFIG) ? PUA_CONFIG : "N/A"}\n- 最后失败: ${state.lastFailureTs ? new Date(state.lastFailureTs).toLocaleTimeString() : "N/A"}\n${capabilityStatus}`,
         "info",
       );
     },
@@ -416,6 +421,69 @@ export default function (pi: ExtensionAPI) {
       state.lastInjectedLevel = 0;
       persistState();
       ctx.ui.notify("[PUA RESET] 失败计数已清零。从头再来。", "info");
+    },
+  });
+
+  /**
+   * 按安装方式嗅探同步脚本路径。
+   * 优先 pi install 路径，fallback 手动安装路径。
+   */
+  function findSyncScript(): { sh?: string; ps1?: string } | null {
+    const paths = [
+      // pi install 方式
+      join(HOME, ".pi", "agent", "git", "github.com", "xnightsky", "pi-pua-x", "bin"),
+      // 手动安装方式
+      join(HOME, ".pi", "agent", "extensions", "pua", "bin"),
+    ];
+    for (const dir of paths) {
+      const sh = join(dir, "sync-pua-references.sh");
+      const ps1 = join(dir, "sync-pua-references.ps1");
+      if (existsSync(sh) || existsSync(ps1)) {
+        const result: { sh?: string; ps1?: string } = {};
+        if (existsSync(sh)) result.sh = sh;
+        if (existsSync(ps1)) result.ps1 = ps1;
+        return result;
+      }
+    }
+    return null;
+  }
+
+  /** /pua-x-sync-skills：一键同步 tanweai/pua 上游 references。 */
+  pi.registerCommand("pua-x-sync-skills", {
+    description: "同步 tanweai/pua 上游 references（flavors、methodology 等）",
+    handler: async (_args, ctx) => {
+      const scripts = findSyncScript();
+      if (!scripts) {
+        ctx.ui.notify(
+          "[PUA-X SYNC] 找不到同步脚本。\n预期路径:\n" +
+          `  ${join(HOME, ".pi", "agent", "git", "github.com", "xnightsky", "pi-pua-x", "bin", "sync-pua-references.{sh,ps1}")}\n` +
+          `  ${join(HOME, ".pi", "agent", "extensions", "pua", "bin", "sync-pua-references.{sh,ps1}")}`,
+          "warning",
+        );
+        return;
+      }
+
+      const isWin = process.platform === "win32";
+      try {
+        if (isWin && scripts.ps1) {
+          execFileSync("powershell.exe", ["-ExecutionPolicy", "Bypass", "-File", scripts.ps1], {
+            stdio: "pipe",
+            encoding: "utf-8",
+          });
+        } else if (scripts.sh) {
+          execFileSync("bash", [scripts.sh], { stdio: "pipe", encoding: "utf-8" });
+        } else if (scripts.ps1) {
+          // 非 Windows 但无 bash，尝试 PowerShell（如通过 pwsh）
+          execFileSync("pwsh", ["-File", scripts.ps1], { stdio: "pipe", encoding: "utf-8" });
+        } else {
+          ctx.ui.notify("[PUA-X SYNC] 当前平台无可用同步脚本。", "warning");
+          return;
+        }
+        ctx.ui.notify("[PUA-X SYNC] references 同步完成。重启 pi 生效。", "success");
+      } catch (e: any) {
+        const msg = e.stderr || e.message || String(e);
+        ctx.ui.notify(`[PUA-X SYNC] 同步失败:\n${msg}`, "error");
+      }
     },
   });
 
@@ -679,7 +747,16 @@ export default function (pi: ExtensionAPI) {
       state.enabled = false;
       writePuaConfig({ always_on: false });
       persistState();
-      ctx.ui.notify("[PUA Extension] pua skill not found. Auto-disabled. Install skill first, then /pua-on.", "warning");
+      ctx.ui.notify(
+        `[PUA Extension] pua skill 未找到，已自动禁用 PUA。\n\n` +
+        `pua skill 是 tanweai/pua 的行为规则文件（flavors、methodology 等）。\n` +
+        `安装方式（选一种）：\n` +
+        `  1. git clone https://github.com/tanweai/pua.git \u003c目录\u003e\n` +
+        `     然后复制 skills/pua/ 到 ~/.pi/agent/skills/pua/\n` +
+        `  2. 或直接从 tanweai/pua 下载 skills/pua/SKILL.md 和 references/ 到 ~/.pi/agent/skills/pua/\n\n` +
+        `安装完成后执行 /pua-on 重新启用。`,
+        "warning",
+      );
       return undefined;
     }
 
