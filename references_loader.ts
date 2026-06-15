@@ -151,6 +151,7 @@ const FLAVOR_MAP: Record<string, Partial<Omit<FlavorInfo, "key">>> = {
   tesla:    { name: "Musk",     icon: "⬛", keywords: "extremely hardcore·ship or die·the algorithm" },
   apple:    { name: "Jobs",     icon: "⬜", keywords: "A players·real artists ship·bozo·Reality Distortion Field" },
   amazon:   { name: "Amazon",   icon: "🔶", keywords: "Customer Obsession·Bias for Action·Dive Deep" },
+  microsoft:{ name: "Microsoft", icon: "🪟", keywords: "Connects·Impact Descriptor·三圈影响力·Exceptional/Successful Impact·learning loop·质疑并删除错误假设" },
 };
 
 /** 原始 repo 中 tesla → musk 的 key 映射 */

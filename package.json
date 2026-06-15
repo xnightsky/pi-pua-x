@@ -9,6 +9,7 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "test": "node --experimental-strip-types --test \"integration-tests/**/*.test.ts\"",
     "check": "for f in *.ts; do case \"$f\" in *.d.ts) continue;; esac; node --experimental-strip-types --check \"$f\"; done && node --check capabilities.js"
   },
   "repository": {
