@@ -37,6 +37,12 @@ import {
   analyzeTurn,
   resolveEnforcementConfig,
 } from "./enforcement.js";
+import {
+  errorSignature,
+  classifyFailurePattern,
+  buildPatternBlock,
+  ERROR_HISTORY_LIMIT,
+} from "./failure_analysis.js";
 
 // ═══════════════════════════════════════════════════════════════
 // 工具分层（失败检测用）
@@ -64,6 +70,8 @@ interface PuaState {
   lastFailureTs: number;
   /** 上一次注入系统提示时的压力等级 */
   lastInjectedLevel: number;
+  /** 最近失败的错误签名（保留 ERROR_HISTORY_LIMIT 条，用于模式分类） */
+  errorHistory: string[];
 }
 
 /** 默认运行时状态 */
@@ -72,6 +80,7 @@ const DEFAULT_STATE: PuaState = {
   failureCount: 0,
   lastFailureTs: 0,
   lastInjectedLevel: 0,
+  errorHistory: [],
 };
 
 /** 当前用户 Home 目录（跨平台兼容） */
@@ -143,21 +152,25 @@ function writeOfficialFailureCount(n: number): void {
  * 读取 pi 扩展私有状态（最后失败时间、上次注入等级）。
  * 文件不存在或解析失败时返回零值对象。
  */
-function readPiExtensionState(): { lastFailureTs: number; lastInjectedLevel: number } {
+function readPiExtensionState(): { lastFailureTs: number; lastInjectedLevel: number; errorHistory: string[] } {
   try {
     if (existsSync(PI_EXTENSION_STATE)) {
       const d = JSON.parse(readFileSync(PI_EXTENSION_STATE, "utf-8"));
-      return { lastFailureTs: d.lastFailureTs ?? 0, lastInjectedLevel: d.lastInjectedLevel ?? 0 };
+      return {
+        lastFailureTs: d.lastFailureTs ?? 0,
+        lastInjectedLevel: d.lastInjectedLevel ?? 0,
+        errorHistory: Array.isArray(d.errorHistory) ? d.errorHistory : [],
+      };
     }
   } catch {}
-  return { lastFailureTs: 0, lastInjectedLevel: 0 };
+  return { lastFailureTs: 0, lastInjectedLevel: 0, errorHistory: [] };
 }
 
 /**
  * 写入 pi 扩展私有状态，自动合并已有字段。
- * @param s - 状态片段，包含最后失败时间戳与上次注入等级
+ * @param s - 状态片段（最后失败时间戳、上次注入等级、错误历史）
  */
-function writePiExtensionState(s: { lastFailureTs: number; lastInjectedLevel: number }): void {
+function writePiExtensionState(s: Partial<{ lastFailureTs: number; lastInjectedLevel: number; errorHistory: string[] }>): void {
   try {
     mkdirSync(PI_AGENT_DIR, { recursive: true });
     const existing = readPiExtensionState();
@@ -234,6 +247,25 @@ function isObservableTier(toolName: string): boolean {
 }
 
 /**
+ * 从一次失败的 tool_result 事件中提取输出文本与退出码，供错误签名提取使用。
+ * 兼容上游 PI 扩展的多字段兜底（details.stderr / content / message 等）。
+ *
+ * @param event - tool_result 事件
+ * @returns 输出文本（截断到 2000 字符）与退出码
+ */
+function extractFailureText(event: any): { text: string; exitCode: number } {
+  const details = event.details ?? {};
+  const exitCode = details.exitCode ?? event.exitCode ?? event.exit_code ?? 1;
+  const candidates = [details.stderr, event.content, details.message, event.message, details.stdout];
+  const text = candidates
+    .map((c) => (typeof c === "string" ? c : c == null ? "" : JSON.stringify(c)))
+    .filter((s) => s.length > 0)
+    .join("\n")
+    .slice(0, 2000);
+  return { text, exitCode: typeof exitCode === "number" ? exitCode : 1 };
+}
+
+/**
  * 检查本地磁盘上是否已安装 pua skill。
  * 直接嗅探 skill 安装目录（与 references_loader.ts 逻辑对齐），
  * 避免依赖 pi 的 systemPromptOptions 传递机制（跨平台/跨版本可能不一致）。
@@ -281,6 +313,7 @@ export default function (pi: ExtensionAPI) {
       failureCount: readOfficialFailureCount(),
       lastFailureTs: piExt.lastFailureTs,
       lastInjectedLevel: piExt.lastInjectedLevel,
+      errorHistory: piExt.errorHistory,
     };
     enforcementConfig = resolveEnforcementConfig(config as any);
   }
@@ -290,7 +323,11 @@ export default function (pi: ExtensionAPI) {
    */
   function persistState() {
     writeOfficialFailureCount(state.failureCount);
-    writePiExtensionState({ lastFailureTs: state.lastFailureTs, lastInjectedLevel: state.lastInjectedLevel });
+    writePiExtensionState({
+      lastFailureTs: state.lastFailureTs,
+      lastInjectedLevel: state.lastInjectedLevel,
+      errorHistory: state.errorHistory,
+    });
   }
 
   /**
@@ -587,6 +624,13 @@ export default function (pi: ExtensionAPI) {
 
       state.failureCount++;
       state.lastFailureTs = now;
+
+      // 记录错误签名用于模式分类（保留最近 ERROR_HISTORY_LIMIT 条）
+      const { text, exitCode } = extractFailureText(event);
+      state.errorHistory.push(errorSignature(text, exitCode));
+      if (state.errorHistory.length > ERROR_HISTORY_LIMIT) {
+        state.errorHistory = state.errorHistory.slice(-ERROR_HISTORY_LIMIT);
+      }
       persistState();
 
       const level = getLevel(state.failureCount);
@@ -598,6 +642,7 @@ export default function (pi: ExtensionAPI) {
       if (state.failureCount > 0) {
         state.failureCount = 0;
         state.lastInjectedLevel = 0;
+        state.errorHistory = [];
         persistState();
       }
     }
@@ -829,12 +874,17 @@ export default function (pi: ExtensionAPI) {
       extraPrompt += "\n\n" + capabilityEnhancement;
     }
 
-    // 3. 叠加压力等级（L1–L4）
+    // 3. 叠加压力等级（L1–L4）+ 失败模式分析块
     const level = getLevel(state.failureCount);
     if (level > 0) {
       const pressure = pressurePrompts[level];
       if (pressure) {
         extraPrompt += "\n\n" + pressure;
+      }
+      // 模式感知：依据最近错误签名分类（SPINNING/EXPLORING/MIXED），叠加针对性提示
+      const patternBlock = buildPatternBlock(classifyFailurePattern(state.errorHistory));
+      if (patternBlock) {
+        extraPrompt += "\n" + patternBlock;
       }
       state.lastInjectedLevel = level;
       writePiExtensionState({ lastFailureTs: state.lastFailureTs, lastInjectedLevel: level });
