@@ -9,6 +9,13 @@
  *   pressure-prompts.md     — L1–L4（本 extension 特有，原始 repo 放在 SKILL.md 里）
  *   agent-team.md, p7/p9/p10-protocol.md, platform.md 等 — 扩展协议
  *
+ * Skill 目录发现规则（按优先级，找含 SKILL.md 的目录）：
+ *   1. ~/.agents/skills/pua/       — 通用 agents 目录
+ *   2. ~/.pi/agent/skills/pua/     — pi agent skill 目录
+ *   3. ~/.codex/skills/pua/        — legacy CLI 兼容
+ *   4. process.cwd()/.agents/skills/pua/  — 项目级
+ *   5. process.cwd()/.pi/skills/pua/      — 项目级
+ *
  * 本 loader 优先从 skill references/ 读取，文件缺失时走内置 fallback。
  * 同步脚本：`bin/sync-pua-references.sh`（从 tanweai/pua main 分支拉取）
  */
@@ -69,7 +76,13 @@ export function findSkillDirs(): string[] {
     join(process.cwd(), ".agents", "skills", SKILL_NAME),
     join(process.cwd(), ".pi", "skills", SKILL_NAME),
   ];
-  return candidates.filter((d) => existsSync(join(d, "SKILL.md")));
+  // 判定条件：SKILL.md 或 references/ 任一存在即视为有效 skill 目录。
+  // 有些用户只 sync 了 references 而未拷贝 SKILL.md（上游两者并列），
+  // 且目录可能是 symlink（pi 自身支持 symlink 加载 skill），
+  // existsSync 会自动 follow symlink。
+  return candidates.filter((d) =>
+    existsSync(join(d, "SKILL.md")) || existsSync(join(d, "references")),
+  );
 }
 
 /**

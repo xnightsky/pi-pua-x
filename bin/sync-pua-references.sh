@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
 # Sync PUA references from tanweai/pua original repo
+#
+# 也可在 pi 中直接执行命令：/pua-x-sync-skills
 # ═══════════════════════════════════════════════════════════════
 
 set -euo pipefail

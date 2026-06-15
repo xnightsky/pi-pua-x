@@ -8,6 +8,20 @@
 
 `pi-pua-x` 是 pi 中 PUA 行为协议的**程序化运行时**。与依赖模型"记住"规则的静态技能文件不同，此扩展利用 pi 的生命周期钩子以确定性方式强制执行行为：
 
+> ## ⚠️ 两个模块：本扩展只替换 **hooks**，不替换 **skill**
+>
+> PUA 由**两个独立模块**组成，完整体验**两者缺一不可**：
+>
+> | 模块 | 是什么 | 谁维护 | `pi-pua-x` 提供？ |
+> |------|--------|--------|---------------------|
+> | **skill** | 静态规则文件（`SKILL.md` + `references/`：flavors、methodology）。模型**读取**这些文件获取 PUA 文化/内容。 | 上游 [`tanweai/pua`](https://github.com/tanweai/pua) —— Claude Code 用完整版，其他 CLI 用最小版 | ❌ **否** |
+> | **hooks** | 程序化运行时（生命周期钩子、失败追踪、压力升级、强制执行）。 | 官方**只维护 hooks** 作为 pi 适配器；`pi-pua-x` 是其增强替代版。 | ✅ **是（本仓库）** |
+>
+> **这就是为什么装了 `pi-pua-x` 之后，你还需要安装/同步官方 `tanweai/pua` skill：**
+> `pi-pua-x` 只替换了 **hooks** 那一半。**skill** 那一半（模型实际读取的 flavor/methodology 文本）仍由上游 `tanweai/pua` 提供。没有 skill，hooks 照跑，但模型没有规则内容可依据（扩展会回退到内置最小集；若完全找不到 skill 则会自动禁用 PUA）。
+>
+> ➡️ 安装顺序：**（1）** 部署 `tanweai/pua` skill → **（2）** 安装 `pi-pua-x`（hooks）→ **（3）** 运行 `/pua-x-sync-skills` 保持 skill 的 `references/` 更新。详见 [INSTALL.md](./INSTALL.md)。
+
 | 能力 | 实现方式 |
 |-----------|-----|
 | 失败追踪 | `tool_result` 事件 → 持久化计数器存储于 `~/.pua/.failure_count` |
@@ -32,18 +46,9 @@
 
 ## 安装
 
-完整说明请参见 [INSTALL.md](./INSTALL.md)。
-
-快速开始：
-
-```bash
-# 推荐：通过 pi install
-pi install git:github.com/xnightsky/pi-pua-x
-
-# 或手动复制（local cp）
-mkdir -p ~/.pi/agent/extensions/pua
-cp -R ./* ~/.pi/agent/extensions/pua/
-```
+> **所有安装方式、配置说明、命令参考、基线插件和故障排查，请参见 [INSTALL.md](./INSTALL.md)。**
+>
+> README 中不再重复安装步骤，避免文档双轨维护导致信息不一致。
 
 ## 命令
 
@@ -53,6 +58,7 @@ cp -R ./* ~/.pi/agent/extensions/pua/
 | `/pua-off` | 禁用 PUA（写入 `always_on=false`） |
 | `/pua-status` | 显示状态、失败计数、压力等级、风味、能力 |
 | `/pua-reset` | 将失败计数器重置为零 |
+| `/pua-x-sync-skills` | 同步 **skill 模块**的上游 tanweai/pua references（flavors、methodology 等）。本扩展是 *hooks* 模块，不捆绑 skill —— 见本 README 顶部的**「两个模块」**高亮说明。 |
 
 ## 配置
 
@@ -104,9 +110,10 @@ pi-pua-x/
 │   ├── RECOMMENDATIONS.md
 │   ├── UPSTREAM.md
 │   └── plans/
-├── pua.ittest.sh            # 集成测试（bash）
-├── pua.ittest.ps1           # 集成测试（PowerShell）
-└── pua-enforcement.ittest.ps1
+└── integration-tests/
+    ├── pua.ittest.sh        # 集成测试（bash）
+    ├── pua.ittest.ps1       # 集成测试（PowerShell）
+    └── pua-enforcement.ittest.ps1
 ```
 
 ## 许可证

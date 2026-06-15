@@ -8,6 +8,20 @@ Stateful PUA runtime extension for [pi](https://github.com/nicepkg/pi-coding-age
 
 `pi-pua-x` is the **programmatic runtime** for the PUA behavioral protocol in pi. Unlike static skill files that rely on the model to "remember" rules, this extension uses pi's lifecycle hooks to deterministically enforce behavior:
 
+> ## ⚠️ Two modules: this replaces **hooks only**, NOT the skill
+>
+> PUA ships as **two separate modules**. You need **both** for the full experience:
+>
+> | Module | What it is | Who maintains it | Provided by `pi-pua-x`? |
+> |--------|-----------|------------------|--------------------------|
+> | **skill** | Static rule files (`SKILL.md` + `references/`: flavors, methodologies). The model *reads* these for PUA culture/content. | Upstream [`tanweai/pua`](https://github.com/tanweai/pua) — full version for Claude Code, minimal for other CLIs | ❌ **No** |
+> | **hooks** | Programmatic runtime (lifecycle hooks, failure tracking, pressure escalation, enforcement). | Officially **only the hooks** are maintained as a pi adapter; `pi-pua-x` is the enhanced replacement. | ✅ **Yes (this repo)** |
+>
+> **This is why you still install/sync the official `tanweai/pua` skill after installing `pi-pua-x`:**
+> `pi-pua-x` replaces only the **hooks** half. The **skill** half (the actual flavor/methodology text the model reads) still comes from upstream `tanweai/pua`. Without the skill, the hooks run but the model has no rule content to act on (the extension falls back to a built-in minimal set and auto-disables PUA if no skill is found).
+>
+> ➡️ Install order: **(1)** deploy the `tanweai/pua` skill → **(2)** install `pi-pua-x` (hooks) → **(3)** run `/pua-x-sync-skills` to keep the skill's `references/` up to date. See [INSTALL.md](./INSTALL.md).
+
 | Capability | How |
 |-----------|-----|
 | Failure tracking | `tool_result` event → persistent counter in `~/.pua/.failure_count` |
@@ -32,18 +46,9 @@ The official pi adapter (~100 lines) does basic prompt injection and counting. T
 
 ## Install
 
-See [INSTALL.md](./INSTALL.md) for full instructions.
-
-Quick start:
-
-```bash
-# Recommended: install via pi
-pi install git:github.com/xnightsky/pi-pua-x
-
-# Or copy manually
-mkdir -p ~/.pi/agent/extensions/pua
-cp -R ./* ~/.pi/agent/extensions/pua/
-```
+> **所有安装方式、配置说明、命令参考、基线插件和故障排查，请参见 [INSTALL.md](./INSTALL.md)。**
+>
+> README 中不再重复安装步骤，避免文档双轨维护导致信息不一致。
 
 ## Commands
 
@@ -53,6 +58,7 @@ cp -R ./* ~/.pi/agent/extensions/pua/
 | `/pua-off` | Disable PUA (writes `always_on=false`) |
 | `/pua-status` | Show status, failure count, pressure level, flavor, capabilities |
 | `/pua-reset` | Reset failure counter to zero |
+| `/pua-x-sync-skills` | Sync the **skill module's** upstream tanweai/pua references (flavors, methodologies, etc.). This extension is the *hooks* module and does not bundle the skill — see the **Two modules** callout near the top of this README. |
 
 ## Configuration
 
@@ -104,9 +110,10 @@ pi-pua-x/
 │   ├── RECOMMENDATIONS.md
 │   ├── UPSTREAM.md
 │   └── plans/
-├── pua.ittest.sh            # Integration test (bash)
-├── pua.ittest.ps1           # Integration test (PowerShell)
-└── pua-enforcement.ittest.ps1
+└── integration-tests/
+    ├── pua.ittest.sh        # Integration test (bash)
+    ├── pua.ittest.ps1       # Integration test (PowerShell)
+    └── pua-enforcement.ittest.ps1
 ```
 
 ## License
