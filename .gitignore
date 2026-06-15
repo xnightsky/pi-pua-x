@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 
 # PUA runtime state (user-local, not repo)
 references/
+
+# npm lockfile (intentionally not tracked)
+package-lock.json
