@@ -41,6 +41,8 @@ import {
   errorSignature,
   classifyFailurePattern,
   buildPatternBlock,
+  shouldDeescalate,
+  buildDeescalationBlock,
   ERROR_HISTORY_LIMIT,
 } from "./failure_analysis.js";
 
@@ -72,6 +74,10 @@ interface PuaState {
   lastInjectedLevel: number;
   /** 最近失败的错误签名（保留 ERROR_HISTORY_LIMIT 条，用于模式分类） */
   errorHistory: string[];
+  /** 本会话达到过的最高压力等级（突破检测用，成功不清零、突破时归零） */
+  peakLevel: number;
+  /** 待注入的突破降压事件（成功路径检测，下一次 before_agent_start 消费后清空） */
+  pendingBreakthrough: { fromLevel: number; afterFailures: number } | null;
 }
 
 /** 默认运行时状态 */
@@ -81,6 +87,8 @@ const DEFAULT_STATE: PuaState = {
   lastFailureTs: 0,
   lastInjectedLevel: 0,
   errorHistory: [],
+  peakLevel: 0,
+  pendingBreakthrough: null,
 };
 
 /** 当前用户 Home 目录（跨平台兼容） */
@@ -152,7 +160,16 @@ function writeOfficialFailureCount(n: number): void {
  * 读取 pi 扩展私有状态（最后失败时间、上次注入等级）。
  * 文件不存在或解析失败时返回零值对象。
  */
-function readPiExtensionState(): { lastFailureTs: number; lastInjectedLevel: number; errorHistory: string[] } {
+/** pi 扩展私有持久化状态 */
+type PiExtState = {
+  lastFailureTs: number;
+  lastInjectedLevel: number;
+  errorHistory: string[];
+  peakLevel: number;
+  pendingBreakthrough: { fromLevel: number; afterFailures: number } | null;
+};
+
+function readPiExtensionState(): PiExtState {
   try {
     if (existsSync(PI_EXTENSION_STATE)) {
       const d = JSON.parse(readFileSync(PI_EXTENSION_STATE, "utf-8"));
@@ -160,17 +177,19 @@ function readPiExtensionState(): { lastFailureTs: number; lastInjectedLevel: num
         lastFailureTs: d.lastFailureTs ?? 0,
         lastInjectedLevel: d.lastInjectedLevel ?? 0,
         errorHistory: Array.isArray(d.errorHistory) ? d.errorHistory : [],
+        peakLevel: d.peakLevel ?? 0,
+        pendingBreakthrough: d.pendingBreakthrough ?? null,
       };
     }
   } catch {}
-  return { lastFailureTs: 0, lastInjectedLevel: 0, errorHistory: [] };
+  return { lastFailureTs: 0, lastInjectedLevel: 0, errorHistory: [], peakLevel: 0, pendingBreakthrough: null };
 }
 
 /**
  * 写入 pi 扩展私有状态，自动合并已有字段。
- * @param s - 状态片段（最后失败时间戳、上次注入等级、错误历史）
+ * @param s - 状态片段（最后失败时间戳、上次注入等级、错误历史、峰值等级、待注入突破）
  */
-function writePiExtensionState(s: Partial<{ lastFailureTs: number; lastInjectedLevel: number; errorHistory: string[] }>): void {
+function writePiExtensionState(s: Partial<PiExtState>): void {
   try {
     mkdirSync(PI_AGENT_DIR, { recursive: true });
     const existing = readPiExtensionState();
@@ -314,6 +333,8 @@ export default function (pi: ExtensionAPI) {
       lastFailureTs: piExt.lastFailureTs,
       lastInjectedLevel: piExt.lastInjectedLevel,
       errorHistory: piExt.errorHistory,
+      peakLevel: piExt.peakLevel,
+      pendingBreakthrough: piExt.pendingBreakthrough,
     };
     enforcementConfig = resolveEnforcementConfig(config as any);
   }
@@ -327,6 +348,8 @@ export default function (pi: ExtensionAPI) {
       lastFailureTs: state.lastFailureTs,
       lastInjectedLevel: state.lastInjectedLevel,
       errorHistory: state.errorHistory,
+      peakLevel: state.peakLevel,
+      pendingBreakthrough: state.pendingBreakthrough,
     });
   }
 
@@ -631,15 +654,24 @@ export default function (pi: ExtensionAPI) {
       if (state.errorHistory.length > ERROR_HISTORY_LIMIT) {
         state.errorHistory = state.errorHistory.slice(-ERROR_HISTORY_LIMIT);
       }
-      persistState();
 
       const level = getLevel(state.failureCount);
+      // 追踪会话峰值压力（突破检测用，成功不清零）
+      if (level > state.peakLevel) state.peakLevel = level;
+      persistState();
+
       if (level > 0) {
         ctx.ui.notify(`PUA 压力升级: L${level}（失败 ${state.failureCount} 次）`, level >= 3 ? "error" : "warning");
       }
     } else {
-      // 可观测层工具成功清零：连续失败链已断
+      // 可观测层工具成功：检测突破降压，否则普通清零
       if (state.failureCount > 0) {
+        if (shouldDeescalate(state.failureCount, state.peakLevel)) {
+          // 连续挣扎后的突破：记录降压事件，下一次 before_agent_start 注入认可话术
+          state.pendingBreakthrough = { fromLevel: state.peakLevel, afterFailures: state.failureCount };
+          state.peakLevel = 0;
+          ctx.ui.notify(`[PUA 突破 ✨] ${state.failureCount} 次失败后成功，压力归零`, "success");
+        }
         state.failureCount = 0;
         state.lastInjectedLevel = 0;
         state.errorHistory = [];
@@ -888,6 +920,16 @@ export default function (pi: ExtensionAPI) {
       }
       state.lastInjectedLevel = level;
       writePiExtensionState({ lastFailureTs: state.lastFailureTs, lastInjectedLevel: level });
+    }
+
+    // 4. 突破降压：连续挣扎后的一次成功，注入味道认可话术 + 强制复盘三步，消费后清空
+    if (state.pendingBreakthrough) {
+      const flavorKey = readPuaConfig().flavor ?? "alibaba";
+      const { fromLevel, afterFailures } = state.pendingBreakthrough;
+      extraPrompt += "\n\n" + buildDeescalationBlock(flavorKey, fromLevel, afterFailures);
+      state.pendingBreakthrough = null;
+      state.lastInjectedLevel = 0;
+      writePiExtensionState({ pendingBreakthrough: null, lastInjectedLevel: 0 });
     }
 
     if (!extraPrompt) return undefined;

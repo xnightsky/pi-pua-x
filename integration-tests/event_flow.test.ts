@@ -119,3 +119,48 @@ test("失败少于 3 次（L1）不注入模式块", async () => {
   const prompt = await agentStart(handlers, ctx);
   assert.doesNotMatch(prompt, /SPINNING|EXPLORING|MIXED/, "不足 3 次失败不应有模式块");
 });
+
+test("连续挣扎(3)后成功 → 注入突破降压块并只注入一次", async () => {
+  const { handlers, ctx } = await freshHarness();
+  await bashFail(handlers, ctx, "error: a1");
+  await bashFail(handlers, ctx, "error: a2");
+  await bashFail(handlers, ctx, "error: a3"); // count=3, peak=L2
+  await bashOk(handlers, ctx);                 // 触发突破
+
+  // 状态：计数清零、记录待注入突破、峰值归零
+  assert.equal(readFileSync(COUNT_FILE, "utf-8").trim(), "0");
+  assert.deepEqual(readState().pendingBreakthrough, { fromLevel: 2, afterFailures: 3 });
+  assert.equal(readState().peakLevel, 0);
+
+  const prompt1 = await agentStart(handlers, ctx);
+  assert.match(prompt1, /突破/, "应注入突破降压块");
+  assert.match(prompt1, /L2 → L0/, "应标注降压方向");
+
+  // 消费后清空，第二次启动不再注入
+  assert.equal(readState().pendingBreakthrough, null);
+  const prompt2 = await agentStart(handlers, ctx);
+  assert.doesNotMatch(prompt2, /突破/, "突破块只注入一次");
+});
+
+test("突破降压块使用配置的味道认可话术（microsoft）", async () => {
+  const { handlers, ctx } = await freshHarness("microsoft");
+  await bashFail(handlers, ctx, "error: m1");
+  await bashFail(handlers, ctx, "error: m2");
+  await bashFail(handlers, ctx, "error: m3");
+  await bashOk(handlers, ctx);
+
+  const prompt = await agentStart(handlers, ctx);
+  assert.match(prompt, /突破/);
+  assert.match(prompt, /Impact|Successful/, "microsoft 味道认可话术");
+});
+
+test("不足 3 次失败后成功不触发突破", async () => {
+  const { handlers, ctx } = await freshHarness();
+  await bashFail(handlers, ctx, "error: x1");
+  await bashFail(handlers, ctx, "error: x2"); // count=2, peak=L1
+  await bashOk(handlers, ctx);
+
+  assert.equal(readState().pendingBreakthrough ?? null, null, "不应记录突破");
+  const prompt = await agentStart(handlers, ctx);
+  assert.doesNotMatch(prompt, /突破/);
+});

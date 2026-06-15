@@ -8,6 +8,8 @@
  * “feat(hooks): add pattern-aware failure analysis + de-escalation breakthrough detection”。
  */
 
+import { normalizeFlavorKey } from "./references_loader.js";
+
 /** 失败模式类型 */
 export type FailurePatternType = "SPINNING" | "EXPLORING" | "MIXED" | "INSUFFICIENT";
 
@@ -103,4 +105,65 @@ ${list}
     default:
       return "";
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 突破降压（de-escalation）—— 对齐上游"奖励端 + 深层换框"
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * 突破触发条件：连续失败 ≥3 次且会话峰值压力 ≥L2 后的一次成功（对齐上游）。
+ *
+ * @param failureCount - 当前连续失败次数
+ * @param peakLevel - 本会话达到过的最高压力等级
+ * @returns 是否应触发突破降压
+ */
+export function shouldDeescalate(failureCount: number, peakLevel: number): boolean {
+  return failureCount >= 3 && peakLevel >= 2;
+}
+
+/** 各味道的突破认可话术（对齐上游 82b8efc6 Part 3）；`{{n}}` 在生成时替换为失败次数 */
+const RECOGNITION_MAP: Record<string, string> = {
+  alibaba: "这才是 Owner 该有的样子，3.75 打底。刚才卡了 {{n}} 次，根因是什么？把正确路径写下来下次直达——这叫沉淀方法论。",
+  bytedance: "结果到位了，ROI 翻正。把刚才有效的方法提炼成 SOP 写进 memory。那 {{n}} 次失败就是数据，别浪费。",
+  huawei: "军令状完成。烧不死的鸟是凤凰——你刚证明了自己烧不死。按自我批判复盘：哪个假设一开始就错了？写入经验库。胜则举杯相庆。",
+  tencent: "赛马跑出来了，你赢了这条赛道。做灰度验证确认可复现、边界清楚，再把这套打法沉淀，下次小步快跑直接跑通。",
+  baidu: "搜索 + 深挖见效了，基本盘守住了。把搜索路径和关键发现记录下来——简单可依赖的前提是路径可复用。",
+  pinduoduo: "本分做到了，结果出来就是硬核。回头看：{{n}} 次失败里有多少步可以砍？极致效率 = 下次零弯路。",
+  meituan: "做难而正确的事，你做到了。猛将发于卒伍——这次卡住就是你的卒伍。把解题路径标准化，下次同类直接套。",
+  jd: "结果拿到了，这才是兄弟该有的执行力。正道成功——过程虽硬路子是对的。沉淀下来，让下一个兄弟不用再走弯路。",
+  xiaomi: "极致！这次交付够极致。把方案性价比拉满——记录最短路径，下次专注直达。",
+  netflix: "Keeper Test: passed. 你扛过了 {{n}} 次失败——这就是 stunning colleague 该做的。记录什么有效、以及之前为什么失败，这是把 adequate 和 exceptional 区分开的学习闭环。",
+  tesla: "Good. Shipped. 现在回溯 The Algorithm：这 {{n}} 次失败里哪些本不该存在？哪个需求一开始就该质疑？把浪费从你的心智模型里删掉。",
+  apple: "That's A-player work. Real artists ship——你穿过了 {{n}} 次失败。现在做减法：到这个解的最短路径是什么？把多余的尝试全部剥掉。优雅 = 最短路径。",
+  amazon: "Delivered Results——LP #1 的体现。从这次成功 Working Backwards 写个小复盘：早期违反了哪条 LP？Dive Deep 弄清原因，记录路径 Earn Trust。",
+  microsoft: "Impact Descriptor 更新：轨迹从 SLITE 回到 Successful Impact。{{n}} 次失败 → 改变动作 → 验证结果，这是完整的学习闭环。把它写进你的 Connects：个人影响 + leverage 已有资产的证据。",
+};
+
+/** 默认认可话术（未知味道兜底） */
+const DEFAULT_RECOGNITION =
+  "突破了。{{n}} 次失败后找到正确方案——这才是真正的 problem solving。复盘：之前为什么卡住？正确路径是什么？写入 memory，下次直达。";
+
+/**
+ * 生成突破降压注入块（对齐上游 `[PUA 突破 ✨]`）。
+ * 含味道认可话术 + 压力归零声明 + 强制复盘三步。
+ *
+ * @param flavorKey - 当前味道 key（兼容 musk→tesla 别名）
+ * @param fromLevel - 突破前的峰值压力等级
+ * @param afterFailures - 连续失败次数
+ * @returns 注入块文本
+ */
+export function buildDeescalationBlock(flavorKey: string, fromLevel: number, afterFailures: number): string {
+  const tmpl = RECOGNITION_MAP[normalizeFlavorKey(flavorKey)] ?? DEFAULT_RECOGNITION;
+  const recognize = tmpl.replaceAll("{{n}}", String(afterFailures));
+  return `[PUA 突破 ✨ — 从 L${fromLevel} 降压]
+
+> ${recognize}
+
+压力已重置：L${fromLevel} → L0。你现在必须：
+1. 简述前 ${afterFailures} 次尝试失败的根因（根因，不是表象）
+2. 把正确方法记录到 memory/evolution.md 供未来复用
+3. 验证方案完整（别过早庆祝）
+
+[PUA生效 🔥] ${afterFailures} 次连续失败后的突破，有效方法应被内化。`;
 }

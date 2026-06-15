@@ -5,6 +5,8 @@ import {
   errorSignature,
   classifyFailurePattern,
   buildPatternBlock,
+  shouldDeescalate,
+  buildDeescalationBlock,
 } from "../failure_analysis.ts";
 
 // ── errorSignature ──
@@ -71,4 +73,42 @@ test("MIXED 块包含模式名", () => {
 
 test("INSUFFICIENT 返回空串", () => {
   assert.equal(buildPatternBlock({ type: "INSUFFICIENT", detail: [] }), "");
+});
+
+// ── shouldDeescalate ──
+test("shouldDeescalate: 失败>=3 且峰值>=2 → true", () => {
+  assert.equal(shouldDeescalate(3, 2), true);
+  assert.equal(shouldDeescalate(5, 4), true);
+});
+
+test("shouldDeescalate: 失败<3 → false", () => {
+  assert.equal(shouldDeescalate(2, 4), false);
+});
+
+test("shouldDeescalate: 峰值<2 → false", () => {
+  assert.equal(shouldDeescalate(3, 1), false);
+});
+
+// ── buildDeescalationBlock ──
+test("buildDeescalationBlock 含突破标记、降压方向、失败次数", () => {
+  const block = buildDeescalationBlock("alibaba", 3, 4);
+  assert.match(block, /突破/);
+  assert.match(block, /L3 → L0/);
+  assert.match(block, /4/);
+});
+
+test("buildDeescalationBlock 不同味道给不同认可话术", () => {
+  const ali = buildDeescalationBlock("alibaba", 2, 3);
+  const ms = buildDeescalationBlock("microsoft", 2, 3);
+  assert.notEqual(ali, ms);
+  assert.match(ms, /Impact|Successful/);
+});
+
+test("buildDeescalationBlock 未知味道回退默认（仍含突破结构）", () => {
+  const block = buildDeescalationBlock("unknown_xyz", 2, 3);
+  assert.match(block, /突破/);
+});
+
+test("buildDeescalationBlock musk 别名归一到 tesla 认可话术", () => {
+  assert.equal(buildDeescalationBlock("musk", 2, 3), buildDeescalationBlock("tesla", 2, 3));
 });
