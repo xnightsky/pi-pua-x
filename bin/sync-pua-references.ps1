@@ -67,6 +67,7 @@ $UpstreamFiles = @(
     "methodology-microsoft.md"
     "display-protocol.md"
     "harness-governance.md"
+    "de-escalation-protocol.md"
     "agent-team.md"
     "evolution-protocol.md"
     "p7-protocol.md"
@@ -77,6 +78,7 @@ $UpstreamFiles = @(
     "teardown-protocol.md"
 )
 # 注：harness-governance.md 和 methodology-microsoft.md 于 2026-05 从上游补齐
+# 注：de-escalation-protocol.md 于 2026-06 从上游补齐（突破降压 + 深层换框，对齐提交 82b8efc6）
 
 # ── 本地扩展文件（不同步，由本扩展自行维护） ──
 $LocalFiles = @("pressure-prompts.md")
