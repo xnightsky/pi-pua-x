@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.0
+
+### Added
+
+- **模式感知失败分析**（对齐上游 `tanweai/pua` 82b8efc6）：新增 `failure_analysis.ts`，按最近 3 次错误签名分类 SPINNING / EXPLORING / MIXED，并在 `before_agent_start` 叠加针对性模式块到压力提示。
+- **突破降压 de-escalation**：连续失败 ≥3 且会话峰值 ≥L2 后的一次成功触发 `[PUA 突破 ✨]`，注入 14 味道认可话术 + 强制复盘三步并将压力归零。`peakLevel` / `pendingBreakthrough` / `errorHistory` 持久化到 `pua-state.json`。
+- **Microsoft 味道**：`FLAVOR_MAP` 补齐（🪟，闭合 `docs/UPSTREAM.md` 差距 #4）。
+- **node:test 测试层**：新增 `npm test`——纯函数单测 + mock-pi 事件流集成共 29 用例（含 `.js→.ts` 解析钩子，确定性无 token）。
+
+### Changed
+
+- 同步脚本（`sync-pua-references.sh` / `.ps1`）`UPSTREAM_FILES` 新增 `de-escalation-protocol.md`。
+- `docs/UPSTREAM.md` 对照刷新到上游 v3.5.0，新增 2026-06 比对表（含 ding 味道 / confidence gate 待评估项）。
+- `tsconfig.json` 纳入 `integration-tests/**/*.ts` 并允许 `.ts` 扩展名导入。
+
 ## v0.2.1
 
 ### Fixed
