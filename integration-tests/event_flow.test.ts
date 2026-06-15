@@ -154,6 +154,13 @@ test("突破降压块使用配置的味道认可话术（microsoft）", async ()
   assert.match(prompt, /Impact|Successful/, "microsoft 味道认可话术");
 });
 
+test("before_agent_start 注入的协议含 Harness Integrity 治理段落", async () => {
+  const { handlers, ctx } = await freshHarness();
+  const prompt = await agentStart(handlers, ctx); // 无失败，仅基础协议
+  assert.match(prompt, /四权/, "注入协议应含四权分立");
+  assert.match(prompt, /harness-governance\.md/, "应含治理引用指针");
+});
+
 test("不足 3 次失败后成功不触发突破", async () => {
   const { handlers, ctx } = await freshHarness();
   await bashFail(handlers, ctx, "error: x1");

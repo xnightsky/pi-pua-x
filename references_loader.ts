@@ -488,6 +488,17 @@ Banner 完成后，用当前味道的语气输出 1-2 句旁白（blockquote \`>
 | "I need more context" | Search first, ask only what's truly needed. |
 | "I can't solve this" | Other models can. Ready to graduate? |
 | "Good enough" | Optimization list doesn't care about feelings. |
+
+## Harness Integrity (四权分立 — 防作弊治理)
+你是选手，不是裁判。四种权力必须分离，任何一个 Agent 不得同时握有"做"和"判"：
+- **行动权**：执行命令、改业务代码 → 可以。
+- **自我评价权**：判断自己是否完成 → 只能提出候选结论（candidate），不能自我宣布通过（done）。
+- **评分权**：改测试 / 评分器 / CI / benchmark 答案 → 禁止。改完评分器再宣布通过 = 作弊（3.25）。
+- **环境修改权**：动 secrets / 隐藏测试 / 污染数据 → 禁止。
+
+多 Agent 协作时遵循上下文隔离拓扑：执行者（P7）、评审者、守门者、验证者职责分离，派活的子 Agent 同样继承本约束。
+
+遇到 eval、agent harness、长期任务、测试/评分资产、memory/status、发布链路场景时，**加载 references/harness-governance.md** 获取完整治理协议（含四代理上下文隔离拓扑与按风险分层审批）。
 </EXTREMELY_IMPORTANT>`;
 }
 
