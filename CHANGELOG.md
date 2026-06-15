@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.1
+
+### Added
+
+- **Harness Integrity 治理段落**：`buildBehaviorProtocol` 内联四权分立原则（行动权 / 自我评价权 / 评分权 / 环境修改权分离）+ 多 Agent 隔离拓扑说明 + 按需加载 `harness-governance.md` 指针。闭合 `docs/UPSTREAM.md` 差距 #2/#3，对齐上游 v3.5.0 SKILL.md 做法（声明原则 + 按需引用）。
+
+### Changed
+
+- `docs/UPSTREAM.md` 标记差距 #2/#3 已闭合，能力对比表更新。
+
 ## v0.3.0
 
 ### Added
