@@ -1,11 +1,14 @@
 {
-  "name": "pi-pua-x",
+  "name": "@xnightsky/pi-pua-x",
   "version": "0.4.0",
   "description": "Stateful PUA runtime extension for pi — lifecycle hooks, pressure escalation, capability-aware enhancement, and subagent inheritance",
   "keywords": [
     "pi-package"
   ],
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "*.ts",
     "*.js",
@@ -38,5 +41,8 @@
     "eslint": "^10.4.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.4"
+  },
+  "dependencies": {
+    "@xnightsky/pi-pua-x": "^0.4.0"
   }
 }
