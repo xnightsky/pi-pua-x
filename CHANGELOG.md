@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.4.0
+
+### Added
+
+- **模型粒度 PUA 开关**（`model_rules.ts`）：新增 `disabled_models` 黑名单机制，按模型 ID 控制 PUA 的启用/禁用。
+  - 配置 `~/.pua/config.json#disabled_models`（glob 模式数组），手写通配符匹配，零依赖。
+  - `before_agent_start` 注入前检测当前模型（`ctx.model`），匹配则跳过全部 PUA 协议注入与 hook。
+  - L2 完全禁用：所有 hook（`tool_result`、`tool_call`、`input`、`turn_end`、`session_before_compact`）在禁用模型中静默。
+  - 新增 `/pua-model list`、`/pua-model add <pattern>`、`/pua-model remove <pattern>` 管理命令。
+  - `/pua-status` 扩展显示当前模型标识、禁用状态和匹配规则。
+
 ## v0.3.1
 
 ### Added

@@ -315,6 +315,47 @@ PI 的 `tool_call` 也可用于后续实现强约束,但不属于当前已实现
 - references 是否来自 skill 或 fallback。
 - 当前可见工具能力摘要。
 - 可见性来源说明。
+- 当前模型标识、是否在禁用列表中、禁用规则列表。
+
+## 模型粒度开关（v0.4.0）
+
+### 配置
+
+`~/.pua/config.json` 中新增 `disabled_models` 数组:
+
+```json
+{
+  "disabled_models": [
+    "anthropic/claude-opus-*",
+    "anthropic/claude-sonnet-4*"
+  ]
+}
+```
+
+### 匹配逻辑
+
+使用经典通配符匹配算法（`model_rules.ts` 中的 `matchModelPattern`），支持 `*` 匹配任意字符。
+模型标识格式为 `{provider}/{id}`（如 `anthropic/claude-opus-4-20250514`）。不依赖第三方库。
+
+### 执行链路
+
+1. `before_agent_start` 入口时通过 `ctx.model` 获取当前模型标识。
+2. 若匹配任一 `disabled_models` 模式，设置 `state.modelDisabled = true`。
+3. 跳过 PUA 协议注入（不拼 behaviorProtocol 到 system prompt）。
+4. 所有 hook（`tool_result`、`tool_call`、`input`、`turn_end`、`session_before_compact`）在入口处检查 `state.modelDisabled`，命中则直接 return。
+5. 下次 `before_agent_start` 重新检测，模型变化自动跟随。
+
+### 命令
+
+- `/pua-model list` — 列出当前禁用模式。
+- `/pua-model add <pattern>` — 添加禁用模式。
+- `/pua-model remove <pattern>` — 移除禁用模式。
+
+### 与全局开关的关系
+
+- 全局 `always_on` 仍控制 PUA 整体启用/禁用。
+- `disabled_models` 在 `always_on=true` 的前提下才生效。
+- 两者是 AND 关系：只有全局开 + 模型不在禁用列表，PUA 才完全生效。
 
 后续可新增 `/pua-flavor <key>`:
 

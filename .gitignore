@@ -147,3 +147,6 @@ references/
 
 # npm lockfile (intentionally not tracked)
 package-lock.json
+
+# Release scripts (not for distribution)
+scripts/

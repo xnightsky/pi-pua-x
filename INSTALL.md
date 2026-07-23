@@ -405,14 +405,17 @@ check_pi_package "pi-ask-user" "pi install npm:pi-ask-user"
 |------|------|
 | `/pua-on` | 启用 PUA（`always_on=true`），当前会话立即生效 |
 | `/pua-off` | 关闭 PUA（`always_on=false`），同时关闭反馈频率 |
-| `/pua-status` | 查看开关状态、失败计数、压力等级、当前味道 |
+| `/pua-status` | 查看开关状态、失败计数、压力等级、当前味道、模型禁用状态 |
 | `/pua-reset` | 清零失败计数与时间戳 |
+| `/pua-model list` | 列出禁用规则的模型模式 |
+| `/pua-model add <pattern>` | 添加禁用模式（如 `anthropic/claude-opus*`） |
+| `/pua-model remove <pattern>` | 移除禁用模式 |
 | `/pua-x-sync-skills` | 一键同步 tanweai/pua 上游 references（flavors、methodology 等） |
 
 ## 配置文件
 
 ```
-~/.pua/config.json          # always_on / flavor 配置
+~/.pua/config.json          # always_on / flavor / disabled_models 配置
 ~/.pua/.failure_count       # 官方失败计数文件（与 tanweai/pua 共享）
 ~/.pi/agent/pua-state.json  # pi 扩展私有状态（最后失败时间、注入等级）
 ```
@@ -425,6 +428,11 @@ check_pi_package "pi-ask-user" "pi install npm:pi-ask-user"
 {
   "always_on": true,
   "flavor": "huawei",
+  "disabled_models": [
+    "anthropic/claude-opus-*",
+    "anthropic/claude-sonnet-4*",
+    "openai/gpt-4*"
+  ],
   "enforcement_level": "suggest",
   "integrity_guard": true,
   "frustration_detection": true,
@@ -437,6 +445,7 @@ check_pi_package "pi-ask-user" "pi install npm:pi-ask-user"
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
+| `disabled_models` | string[] | `[]` | glob 模式匹配禁用 PUA 的模型，匹配时跳过协议注入 + 所有 hook |
 | `enforcement_level` | `"observe"` \| `"suggest"` \| `"enforce"` | `"suggest"` | observe=只通知，suggest=通知+确认，enforce=自动 block |
 | `integrity_guard` | boolean | `true` | 四权分立保护（写入 tests/CI/secrets 时提示或拦截） |
 | `frustration_detection` | boolean | `true` | 用户挫败检测（仅交互模式） |

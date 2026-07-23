@@ -45,6 +45,11 @@ import {
   buildDeescalationBlock,
   ERROR_HISTORY_LIMIT,
 } from "./failure_analysis.js";
+import {
+  getDisabledModels,
+  isModelDisabled,
+  formatModelId,
+} from "./model_rules.js";
 
 // ═══════════════════════════════════════════════════════════════
 // 工具分层（失败检测用）
@@ -78,6 +83,8 @@ interface PuaState {
   peakLevel: number;
   /** 待注入的突破降压事件（成功路径检测，下一次 before_agent_start 消费后清空） */
   pendingBreakthrough: { fromLevel: number; afterFailures: number } | null;
+  /** 当前模型是否在禁用列表中（L2 完全禁用时跳过所有 hook） */
+  modelDisabled: boolean;
 }
 
 /** 默认运行时状态 */
@@ -89,6 +96,7 @@ const DEFAULT_STATE: PuaState = {
   errorHistory: [],
   peakLevel: 0,
   pendingBreakthrough: null,
+  modelDisabled: false,
 };
 
 /** 当前用户 Home 目录（跨平台兼容） */
@@ -335,6 +343,7 @@ export default function (pi: ExtensionAPI) {
       errorHistory: piExt.errorHistory,
       peakLevel: piExt.peakLevel,
       pendingBreakthrough: piExt.pendingBreakthrough,
+      modelDisabled: false,
     };
     enforcementConfig = resolveEnforcementConfig(config as any);
   }
@@ -466,7 +475,7 @@ export default function (pi: ExtensionAPI) {
         ? `  ${skillDirs.join("\n  ")}`
         : "  (未找到)";
       ctx.ui.notify(
-        `PUA 状态:\n- 开关: ${state.enabled ? "ON 🔥" : "OFF"}\n- 失败计数: ${state.failureCount}\n- 压力等级: ${levelText}\n- 味道: ${flavor}\n- pua skill: ${skillStatus}\n- skill 目录:\n${skillDirLine}\n- references: ${referencesSource}\n- config: ${existsSync(PUA_CONFIG) ? PUA_CONFIG : "N/A"}\n- 最后失败: ${state.lastFailureTs ? new Date(state.lastFailureTs).toLocaleTimeString() : "N/A"}\n${capabilityStatus}`,
+        `PUA 状态:\n- 开关: ${state.enabled ? "ON 🔥" : "OFF"}\n- 失败计数: ${state.failureCount}\n- 压力等级: ${levelText}\n- 味道: ${flavor}\n- pua skill: ${skillStatus}\n- skill 目录:\n${skillDirLine}\n- references: ${referencesSource}\n- config: ${existsSync(PUA_CONFIG) ? PUA_CONFIG : "N/A"}\n- 最后失败: ${state.lastFailureTs ? new Date(state.lastFailureTs).toLocaleTimeString() : "N/A"}\n${capabilityStatus}\n- 当前模型: ${formatModelId(ctx.model) || "N/A"}\n- 模型禁用: ${state.modelDisabled ? "是 🔇" : "否"}\n- 禁用规则: ${getDisabledModels(config).length > 0 ? getDisabledModels(config).join(", ") : "（无）"}`,
         "info",
       );
     },
@@ -507,6 +516,71 @@ export default function (pi: ExtensionAPI) {
     }
     return null;
   }
+
+  /**
+   * /pua-model：管理模型禁用规则。
+   * 子命令：list / add <pattern> / remove <pattern>
+   */
+  pi.registerCommand("pua-model", {
+    description: "管理模型禁用规则（list / add <pattern> / remove <pattern>）",
+    handler: async (args, ctx) => {
+      const trimmed = (args ?? "").trim();
+      const parts = trimmed.split(/\s+/);
+      const sub = parts[0]?.toLowerCase() ?? "";
+
+      if (sub === "list") {
+        const config = readPuaConfig();
+        const list = getDisabledModels(config);
+        if (list.length === 0) {
+          ctx.ui.notify("[PUA MODEL] 当前没有禁用规则。\n使用 /pua-model add <pattern> 添加。", "info");
+        } else {
+          ctx.ui.notify(
+            `[PUA MODEL] 禁用列表（${list.length} 条）:\n${list.map((p, i) => `  ${i + 1}. ${p}`).join("\n")}`,
+            "info",
+          );
+        }
+        return;
+      }
+
+      if (sub === "add" && parts.length >= 2) {
+        const pattern = parts.slice(1).join(" ");
+        const config = readPuaConfig();
+        const existing = getDisabledModels(config);
+        if (existing.includes(pattern)) {
+          ctx.ui.notify(`[PUA MODEL] 模式已存在: ${pattern}`, "warning");
+          return;
+        }
+        const updated = [...existing, pattern];
+        writePuaConfig({ disabled_models: updated });
+        ctx.ui.notify(`[PUA MODEL] 已添加: ${pattern}`, "success");
+        return;
+      }
+
+      if (sub === "remove" && parts.length >= 2) {
+        const pattern = parts.slice(1).join(" ");
+        const config = readPuaConfig();
+        const existing = getDisabledModels(config);
+        const idx = existing.indexOf(pattern);
+        if (idx === -1) {
+          ctx.ui.notify(`[PUA MODEL] 未找到模式: ${pattern}`, "warning");
+          return;
+        }
+        const updated = [...existing];
+        updated.splice(idx, 1);
+        writePuaConfig({ disabled_models: updated });
+        ctx.ui.notify(`[PUA MODEL] 已移除: ${pattern}`, "success");
+        return;
+      }
+
+      ctx.ui.notify(
+        `用法: /pua-model <子命令>\n` +
+        `  list             列出禁用规则\n` +
+        `  add <pattern>    添加禁用模式（如 anthropic/claude-opus*）\n` +
+        `  remove <pattern>  移除禁用模式`,
+        "info",
+      );
+    },
+  });
 
   /**
    * /pua-x-sync-skills：一键同步 tanweai/pua 上游 references。
@@ -619,7 +693,7 @@ export default function (pi: ExtensionAPI) {
    * 去抖动：相同命令骨架 3 秒内只计一次。
    */
   pi.on("tool_result", async (event, ctx) => {
-    if (!state.enabled) return;
+    if (!state.enabled || state.modelDisabled) return;
 
     const toolName = (event.toolName ?? event.tool_name ?? "").toLowerCase();
 
@@ -687,7 +761,7 @@ export default function (pi: ExtensionAPI) {
    * “Sub-agent 也不养闲”协议的最小映射。
    */
   pi.on("tool_call", async (event) => {
-    if (!state.enabled) return undefined;
+    if (!state.enabled || state.modelDisabled) return undefined;
 
     const toolName = event.toolName ?? event.tool_name ?? event.name;
     if (!isSubagentToolName(toolName)) return undefined;
@@ -714,7 +788,7 @@ export default function (pi: ExtensionAPI) {
    * 匹配到挫败关键词时，自动将失败计数提升到至少 2（触发 L1）。
    */
   pi.on("input", (event, ctx) => {
-    if (!state.enabled || !enforcementConfig.frustration_detection) return undefined;
+    if (!state.enabled || state.modelDisabled || !enforcementConfig.frustration_detection) return undefined;
     const text = event?.text ?? "";
     if (detectFrustration(text)) {
       if (state.failureCount < 2) {
@@ -734,7 +808,7 @@ export default function (pi: ExtensionAPI) {
    * 在已有子 agent 装饰逻辑之后追加。
    */
   pi.on("tool_call", async (event, ctx) => {
-    if (!state.enabled) return undefined;
+    if (!state.enabled || state.modelDisabled) return undefined;
 
     const toolName = event.toolName ?? event.tool_name ?? event.name ?? "";
     const input = event.input ?? event.args ?? event.arguments;
@@ -794,7 +868,7 @@ export default function (pi: ExtensionAPI) {
    * 将当前 PUA 运行时状态写入 builder-journal.md。
    */
   pi.on("session_before_compact", (event, ctx) => {
-    if (!state.enabled || !enforcementConfig.compact_state_save) return undefined;
+    if (!state.enabled || state.modelDisabled || !enforcementConfig.compact_state_save) return undefined;
     try {
       const config = readPuaConfig();
       const snapshot = buildCompactStateMarkdown({
@@ -816,7 +890,7 @@ export default function (pi: ExtensionAPI) {
    * Hook 4: 空口完成 + 原地打转检测。
    */
   pi.on("turn_end", (event, ctx) => {
-    if (!state.enabled) return undefined;
+    if (!state.enabled || state.modelDisabled) return undefined;
 
     const message = event?.message;
     const toolResults = event?.toolResults ?? [];
@@ -894,6 +968,14 @@ export default function (pi: ExtensionAPI) {
       );
       return undefined;
     }
+
+    // 模型规则检查：当前模型在禁用列表中则 L2 完全禁用
+    // 此检查位于 skill 检查之后、注入构建之前，确保用户明确关闭时才是禁用
+    const modelCheckCfg = readPuaConfig();
+    const disabledModels = getDisabledModels(modelCheckCfg);
+    const modelId = formatModelId(ctx.model);
+    state.modelDisabled = modelId ? isModelDisabled(modelId, disabledModels) : false;
+    if (state.modelDisabled) return undefined;
 
     const capabilitySnapshot = await getCapabilitySnapshot(event);
 
