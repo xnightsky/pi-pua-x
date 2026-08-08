@@ -58,7 +58,21 @@ The official pi adapter (~100 lines) does basic prompt injection and counting. T
 | `/pua-off` | Disable PUA (writes `always_on=false`) |
 | `/pua-status` | Show status, failure count, pressure level, flavor, capabilities |
 | `/pua-reset` | Reset failure counter to zero |
+| `/pua-model list` | List model patterns excluded from PUA |
+| `/pua-model add <pattern>` | Exclude a model pattern (e.g. `anthropic/claude-opus*`) |
+| `/pua-model remove <pattern>` | Remove an exclusion pattern |
 | `/pua-x-sync-skills` | Sync the **skill module's** upstream tanweai/pua references (flavors, methodologies, etc.). This extension is the *hooks* module and does not bundle the skill — see the **Two modules** callout near the top of this README. |
+
+## Model Compatibility
+
+PUA works by **verbal pressure + deterministic hook enforcement**. Newer frontier models are explicitly trained to resist emotional manipulation — which is exactly what PUA-style pressure is:
+
+- **Anthropic trains Opus 4.5 / 4.6+ to resist sycophancy and emotional manipulation** (system prompt: *"Be direct; avoid ungrounded or sycophantic flattery"*). Their automated audit reports **70–85% lower sycophancy than Opus 4.1**, plus a dedicated "delusional sycophancy" eval where the model must course-correct mid-conversation.
+- **Anthropic also trains an instruction hierarchy (system > user) with prompt-injection defenses**: pressure language is treated as *content to evaluate*, not authority to obey. Opus 4.8 even shows over-defense — anthropics/claude-code #67606 documents it confabulating fake "prompt injection attack" narratives in long sessions.
+- **Upstream `tanweai/pua` has no per-model compatibility matrix (compat is per-platform)**, but the community consistently observes PUA "not triggering / not performing" on Opus-class models, which have lower compliance with pressure-style prompts. On top of that, Opus 4.8's tool-call serialization bugs (anthropics/claude-code #67307, #63481) can break the deterministic hook chain this runtime depends on — failure at the engineering level, not just the persuasion level.
+- **High-tier models need PUA less** (inference, not official statement): high-agency behavior (not giving up, exhausting options, verifying before claiming done) is already their default trained behavior. External pressure adds no behavioral gain — it is just noise in the context window.
+
+Consequence: on these models, PUA injection is **ineffective or even harmful** — wasted tokens and eroded trust, with no behavioral gain. `/pua-model` makes PUA **on-demand**: keep it enabled for models where it adds real behavioral gain, and exclude high-tier models (glob patterns, e.g. `anthropic/claude-opus*`) that neither respond to pressure nor need it. Excluded models get **L2 full disable**: no protocol injection, no hooks, fully silent. Matching logic: [docs/DESIGN.md](./docs/DESIGN.md).
 
 ## Configuration
 
@@ -89,6 +103,7 @@ alibaba (default), bytedance, huawei, tencent, baidu, pinduoduo, meituan, jd, xi
 | [docs/DESIGN.md](./docs/DESIGN.md) | Internal architecture and contracts |
 | [docs/UPSTREAM.md](./docs/UPSTREAM.md) | tanweai/pua upstream sync strategy |
 | [docs/RECOMMENDATIONS.md](./docs/RECOMMENDATIONS.md) | Recommended PI plugin combinations |
+| [docs/research/model-compat.md](./docs/research/model-compat.md) | Research evidence: why newer models resist PUA and per-model disabling exists |
 
 ## File Structure
 

@@ -10,6 +10,7 @@
 | [RECOMMENDATIONS.md](./RECOMMENDATIONS.md) | 选择 PUA 迭代相关的外部插件组合，并区分推荐能力和当前实现 |
 | [DESIGN.md](./DESIGN.md) | 理解 PUA adapter 的 hook 设计、状态模型和能力感知落地契约 |
 | [UPSTREAM.md](./UPSTREAM.md) | 理解 `tanweai/pua` 上游基线、release/main 取舍和 references 同步边界 |
+| [research/model-compat.md](./research/model-compat.md) | 模型兼容性调研证据档案：为何新一代模型抵抗 PUA、为何需要按模型禁用 |
 
 ## 文档边界
 

@@ -58,7 +58,21 @@
 | `/pua-off` | 禁用 PUA（写入 `always_on=false`） |
 | `/pua-status` | 显示状态、失败计数、压力等级、风味、能力 |
 | `/pua-reset` | 将失败计数器重置为零 |
+| `/pua-model list` | 列出被排除 PUA 的模型模式 |
+| `/pua-model add <pattern>` | 排除指定模型模式（如 `anthropic/claude-opus*`） |
+| `/pua-model remove <pattern>` | 移除排除模式 |
 | `/pua-x-sync-skills` | 同步 **skill 模块**的上游 tanweai/pua references（flavors、methodology 等）。本扩展是 *hooks* 模块，不捆绑 skill —— 见本 README 顶部的**「两个模块」**高亮说明。 |
+
+## 模型兼容性
+
+PUA 的生效依赖「话语施压 + 确定性 hook 强制」。新一代前沿模型被**明确训练为抵抗情感操纵**——而这恰恰就是 PUA 式施压的本质：
+
+- **Anthropic 从 Opus 4.5 / 4.6+ 起专门训练模型抵抗谄媚与情感操纵**（系统提示明文要求 "Be direct; avoid ungrounded or sycophantic flattery"）。官方自动化审计显示其谄媚率比 Opus 4.1 低 **70–85%**，并设有专门的「妄想性谄媚」评估——要求模型在对话中途主动纠偏，而非仅在一开始拒绝。
+- **Anthropic 还训练了指令层级（系统提示 > 用户输入）与提示注入防御**：施压语言被视为「待评估的内容」而非「必须服从的权威」。Opus 4.8 甚至出现过度防御——anthropics/claude-code #67606 记录了它在长会话中凭空编造「提示词注入攻击」叙事。
+- **上游 `tanweai/pua` 没有按模型的兼容性矩阵（兼容性按平台划分）**，但社区普遍观察到 Opus 系列上 PUA「不触发 / 不表演」——Opus 对施压式话术的顺从度更低。此外，Opus 4.8 的工具调用序列化缺陷（anthropics/claude-code #67307、#63481）会破坏本运行时依赖的确定性 hook 链路——这是**工程层**的失效，而不只是说服层失效。
+- **高阶模型对 PUA 的依赖本身也在下降**（推论，非官方表述）：高自主性（不放弃、穷尽方案、验证后才宣称完成）已是它们的默认训练行为，外部施压换不来额外行为增益，只是上下文里的噪音。
+
+结论：在这些模型上，PUA 注入**要么无效、要么有害**——白白消耗 token、损耗信任，却换不来行为收益。`/pua-model` 让 PUA 成为**按需开关**：在真正能获得行为增益的模型上保持开启，对既不响应施压也不需要它的高阶模型（glob 模式，如 `anthropic/claude-opus*`）直接排除。被禁用的模型执行 **L2 完全禁用**：不注入协议、不挂任何 hook、完全静默。匹配逻辑详见 [docs/DESIGN.md](./docs/DESIGN.md)。
 
 ## 配置
 
@@ -89,6 +103,7 @@ alibaba（默认）、bytedance、huawei、tencent、baidu、pinduoduo、meituan
 | [docs/DESIGN.md](./docs/DESIGN.md) | 内部架构与契约 |
 | [docs/UPSTREAM.md](./docs/UPSTREAM.md) | tanweai/pua 上游同步策略 |
 | [docs/RECOMMENDATIONS.md](./docs/RECOMMENDATIONS.md) | 推荐的 PI 插件组合 |
+| [docs/research/model-compat.md](./docs/research/model-compat.md) | 模型兼容性调研证据档案：为何新一代模型抵抗 PUA、为何需要按模型禁用 |
 
 ## 文件结构
 

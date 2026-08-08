@@ -409,6 +409,8 @@ check_pi_package "pi-ask-user" "pi install npm:pi-ask-user"
 | `/pua-model remove <pattern>` | 移除禁用模式 |
 | `/pua-x-sync-skills` | 一键同步 tanweai/pua 上游 references（flavors、methodology 等） |
 
+> `/pua-model` 用于按模型粒度关闭 PUA，定位是**按需开关**：新一代模型（如 Anthropic Opus 4.5+）经反谄媚/反情感操纵训练并建立指令层级后，会抵抗 PUA 式话语施压（社区普遍观察到 Opus 系列上 PUA「不触发 / 不表演」），且高阶模型对 PUA 的依赖本身更低（高自主性是默认行为）。对这类模型注入 PUA 只会浪费 token 且无行为收益，建议用 `/pua-model add <pattern>` 排除，让 PUA 只作用于能获得行为增益的模型。配置字段 `disabled_models` 见下文示例；原理与证据分层详见 [README 模型兼容性](./README.md)。
+
 ## 配置文件
 
 ```
