@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.0
+
+### Changed
+
+- **`/pua-model` 命令重构**：`add <pattern>` / `remove <pattern>` 改为 `disable <pattern>` / `restore <pattern>`，语义对齐「禁用管理」语境（disable = 禁用该模型的 PUA，restore = 恢复）。原 add/remove 不再支持（**破坏性变更**）。
+- **`/pua-model` 文档补全**：README / README.zh / INSTALL / DESIGN 标注命令与「模型兼容性」说明；新增 `docs/research/model-compat.md` 调研档案（资料来源声明 + 证据分层 + 模型适用边界 + 跨平台证据 + 学术实证）。
+
 ## v0.4.0
 
 ### Added
