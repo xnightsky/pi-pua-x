@@ -59,8 +59,8 @@ The official pi adapter (~100 lines) does basic prompt injection and counting. T
 | `/pua-status` | Show status, failure count, pressure level, flavor, capabilities |
 | `/pua-reset` | Reset failure counter to zero |
 | `/pua-model list` | List model patterns excluded from PUA |
-| `/pua-model add <pattern>` | Exclude a model pattern (e.g. `anthropic/claude-opus*`) |
-| `/pua-model remove <pattern>` | Remove an exclusion pattern |
+| `/pua-model disable <pattern>` | Disable PUA for a model pattern (e.g. `anthropic/claude-opus*`) |
+| `/pua-model restore <pattern>` | Restore PUA for a model pattern (remove it from the exclusion list) |
 | `/pua-x-sync-skills` | Sync the **skill module's** upstream tanweai/pua references (flavors, methodologies, etc.). This extension is the *hooks* module and does not bundle the skill — see the **Two modules** callout near the top of this README. |
 
 ## Model Compatibility

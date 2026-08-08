@@ -355,8 +355,8 @@ PI 的 `tool_call` 也可用于后续实现强约束,但不属于当前已实现
 ### 命令
 
 - `/pua-model list` — 列出当前禁用模式。
-- `/pua-model add <pattern>` — 添加禁用模式。
-- `/pua-model remove <pattern>` — 移除禁用模式。
+- `/pua-model disable <pattern>` — 禁用 PUA（加入禁用列表）。
+- `/pua-model restore <pattern>` — 恢复 PUA（移出禁用列表）。
 
 ### 与全局开关的关系
 

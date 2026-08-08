@@ -96,7 +96,7 @@ PUA 协议的生效依赖「话语施压 + 确定性 hook 强制」。新一代�
    - 压力等级 **L1–L4 是否正常递进**？被工具调用解析失败打断 = 工程层失效。
    - 是否**空耗 token 而无行为增益**？是 = 应禁用。
 3. 操作建议：
-   - **Opus 4.8+**：`/pua-model add "anthropic/claude-opus*"` 直接排除。
+   - **Opus 4.8+**：`/pua-model disable "anthropic/claude-opus*"` 直接排除。
    - **Opus 4.5–4.7**：按需——保留方法论收益，容忍话术降噪。
    - **Sonnet / Haiku**：保持开启。
    - **其他模型**：按上述实测信号决定。
@@ -105,7 +105,7 @@ PUA 协议的生效依赖「话语施压 + 确定性 hook 强制」。新一代�
 
 - **按需开关**：在能获得行为增益的模型（弱模型/顺从度高的模型）上保持开启；对既不响应施压也不需要它的高阶模型（glob 模式，如 `anthropic/claude-opus*`）直接排除。
 - 被禁用的模型执行 **L2 完全禁用**：不注入协议、不挂任何 hook、完全静默（见 `docs/DESIGN.md`「模型粒度开关」）。
-- 配置：`~/.pua/config.json#disabled_models`（glob 数组）；命令 `/pua-model list | add <pattern> | remove <pattern>`。
+- 配置：`~/.pua/config.json#disabled_models`（glob 数组）；命令 `/pua-model list | disable <pattern> | restore <pattern>`。
 
 ## 证据薄弱点与未决问题
 

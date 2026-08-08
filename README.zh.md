@@ -59,8 +59,8 @@
 | `/pua-status` | 显示状态、失败计数、压力等级、风味、能力 |
 | `/pua-reset` | 将失败计数器重置为零 |
 | `/pua-model list` | 列出被排除 PUA 的模型模式 |
-| `/pua-model add <pattern>` | 排除指定模型模式（如 `anthropic/claude-opus*`） |
-| `/pua-model remove <pattern>` | 移除排除模式 |
+| `/pua-model disable <pattern>` | 禁用指定模型的 PUA（如 `anthropic/claude-opus*`） |
+| `/pua-model restore <pattern>` | 恢复指定模型的 PUA（移出禁用列表） |
 | `/pua-x-sync-skills` | 同步 **skill 模块**的上游 tanweai/pua references（flavors、methodology 等）。本扩展是 *hooks* 模块，不捆绑 skill —— 见本 README 顶部的**「两个模块」**高亮说明。 |
 
 ## 模型兼容性

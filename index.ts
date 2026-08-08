@@ -519,10 +519,11 @@ export default function (pi: ExtensionAPI) {
 
   /**
    * /pua-model：管理模型禁用规则。
-   * 子命令：list / add <pattern> / remove <pattern>
+   * 子命令：list / disable <pattern> / restore <pattern>
+   * disable = 将模型加入禁用列表（关闭该模型的 PUA）；restore = 移出（恢复 PUA）。
    */
   pi.registerCommand("pua-model", {
-    description: "管理模型禁用规则（list / add <pattern> / remove <pattern>）",
+    description: "按模型禁用/恢复 PUA（list / disable / restore）",
     handler: async (args, ctx) => {
       const trimmed = (args ?? "").trim();
       const parts = trimmed.split(/\s+/);
@@ -532,7 +533,7 @@ export default function (pi: ExtensionAPI) {
         const config = readPuaConfig();
         const list = getDisabledModels(config);
         if (list.length === 0) {
-          ctx.ui.notify("[PUA MODEL] 当前没有禁用规则。\n使用 /pua-model add <pattern> 添加。", "info");
+          ctx.ui.notify("[PUA MODEL] 当前没有禁用规则。\n使用 /pua-model disable <pattern> 禁用。", "info");
         } else {
           ctx.ui.notify(
             `[PUA MODEL] 禁用列表（${list.length} 条）:\n${list.map((p, i) => `  ${i + 1}. ${p}`).join("\n")}`,
@@ -542,41 +543,41 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      if (sub === "add" && parts.length >= 2) {
+      if (sub === "disable" && parts.length >= 2) {
         const pattern = parts.slice(1).join(" ");
         const config = readPuaConfig();
         const existing = getDisabledModels(config);
         if (existing.includes(pattern)) {
-          ctx.ui.notify(`[PUA MODEL] 模式已存在: ${pattern}`, "warning");
+          ctx.ui.notify(`[PUA MODEL] 该模型已在禁用列表: ${pattern}`, "warning");
           return;
         }
         const updated = [...existing, pattern];
         writePuaConfig({ disabled_models: updated });
-        ctx.ui.notify(`[PUA MODEL] 已添加: ${pattern}`, "success");
+        ctx.ui.notify(`[PUA MODEL] 已禁用 PUA: ${pattern}`, "success");
         return;
       }
 
-      if (sub === "remove" && parts.length >= 2) {
+      if (sub === "restore" && parts.length >= 2) {
         const pattern = parts.slice(1).join(" ");
         const config = readPuaConfig();
         const existing = getDisabledModels(config);
         const idx = existing.indexOf(pattern);
         if (idx === -1) {
-          ctx.ui.notify(`[PUA MODEL] 未找到模式: ${pattern}`, "warning");
+          ctx.ui.notify(`[PUA MODEL] 该模型不在禁用列表: ${pattern}`, "warning");
           return;
         }
         const updated = [...existing];
         updated.splice(idx, 1);
         writePuaConfig({ disabled_models: updated });
-        ctx.ui.notify(`[PUA MODEL] 已移除: ${pattern}`, "success");
+        ctx.ui.notify(`[PUA MODEL] 已恢复 PUA: ${pattern}`, "success");
         return;
       }
 
       ctx.ui.notify(
         `用法: /pua-model <子命令>\n` +
-        `  list             列出禁用规则\n` +
-        `  add <pattern>    添加禁用模式（如 anthropic/claude-opus*）\n` +
-        `  remove <pattern>  移除禁用模式`,
+        `  list                  列出禁用规则\n` +
+        `  disable <pattern>     禁用 PUA（如 anthropic/claude-opus*）\n` +
+        `  restore <pattern>     恢复 PUA`,
         "info",
       );
     },
