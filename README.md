@@ -109,11 +109,14 @@ alibaba (default), bytedance, huawei, tencent, baidu, pinduoduo, meituan, jd, xi
 
 ```
 pi-pua-x/
-├── index.ts                 # Extension entry point
-├── capabilities.js          # Capability snapshot + enhancement prompts
-├── enforcement.ts           # 4 enforcement hooks logic
-├── references_loader.ts     # Flavor/methodology/pressure loader
-├── global.d.ts              # Type stubs for PI extension API
+├── src/                     # Runtime sources
+│   ├── index.ts             # Extension entry point
+│   ├── capabilities.js      # Capability snapshot + enhancement prompts
+│   ├── enforcement.ts       # 4 enforcement hooks logic
+│   ├── failure_analysis.ts  # Pattern-aware failure analysis
+│   ├── model_rules.ts       # Per-model PUA toggle (wildcard matching)
+│   ├── references_loader.ts # Flavor/methodology/pressure loader
+│   └── global.d.ts          # Type stubs for PI extension API
 ├── tsconfig.json            # TypeScript config (noEmit, type-check only)
 ├── INSTALL.md               # Installation guide
 ├── bin/

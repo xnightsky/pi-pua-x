@@ -109,11 +109,14 @@ alibaba（默认）、bytedance、huawei、tencent、baidu、pinduoduo、meituan
 
 ```
 pi-pua-x/
-├── index.ts                 # 扩展入口
-├── capabilities.js          # 能力快照 + 增强提示
-├── enforcement.ts           # 4 个强制执行钩子逻辑
-├── references_loader.ts     # 风味/方法论/压力加载器
-├── global.d.ts              # PI 扩展 API 的类型存根
+├── src/                     # 运行时源码
+│   ├── index.ts             # 扩展入口
+│   ├── capabilities.js      # 能力快照 + 增强提示
+│   ├── enforcement.ts       # 4 个强制执行钩子逻辑
+│   ├── failure_analysis.ts  # 模式感知失败分析
+│   ├── model_rules.ts       # 模型粒度 PUA 开关（通配符匹配）
+│   ├── references_loader.ts # 风味/方法论/压力加载器
+│   └── global.d.ts          # PI 扩展 API 的类型存根
 ├── tsconfig.json            # TypeScript 配置（仅类型检查，不输出）
 ├── INSTALL.md               # 安装指南
 ├── bin/

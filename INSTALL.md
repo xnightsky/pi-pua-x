@@ -158,7 +158,7 @@ $target = Join-Path $env:USERPROFILE ".pi\agent\extensions\pua\index.ts"
 if (Test-Path -LiteralPath $target) {
     Write-Host "[OK] PUA PI extension installed"
 } else {
-    Write-Warning "PUA PI extension not found. Install with: Copy-Item -Path .\* -Destination `$env:USERPROFILE\.pi\agent\extensions\pua\ -Recurse -Force"
+    Write-Warning "PUA PI extension not found. Install with: Copy-Item -Path .\src\* -Destination `$env:USERPROFILE\.pi\agent\extensions\pua\ -Recurse -Force"
 }
 ```
 
@@ -168,7 +168,7 @@ target="$HOME/.pi/agent/extensions/pua/index.ts"
 if [ -f "$target" ]; then
   printf '[OK] PUA PI extension installed\n'
 else
-  printf '[WARN] PUA PI extension not found. Install with: mkdir -p "$HOME/.pi/agent/extensions/pua" && cp -R ./* "$HOME/.pi/agent/extensions/pua/"\n'
+  printf '[WARN] PUA PI extension not found. Install with: mkdir -p "$HOME/.pi/agent/extensions/pua" && cp -R ./src/* "$HOME/.pi/agent/extensions/pua/"\n'
 fi
 ```
 
@@ -180,15 +180,15 @@ fi
    **Linux / macOS (bash)**
    ```bash
    mkdir -p ~/.pi/agent/extensions/pua
-   cp -R ./* ~/.pi/agent/extensions/pua/
+   cp -R ./src/* ~/.pi/agent/extensions/pua/
    ```
-   > `cp -R ./*` 会跳过隐藏文件（如 `.git/`、`node_modules/`），这些对扩展运行非必需。如需完整复制（含隐藏文件），用 `cp -R ./. ~/.pi/agent/extensions/pua/`。
+   > `cp -R ./src/*` 只复制源码目录，`.git/`、`node_modules/` 等天然排除，这些对扩展运行非必需。如需复制完整源码目录（含隐藏文件），用 `cp -R ./src/. ~/.pi/agent/extensions/pua/`。
 
    **Windows (PowerShell)**
    ```powershell
    $target = Join-Path $env:USERPROFILE ".pi\agent\extensions\pua"
    New-Item -ItemType Directory -Path $target -Force | Out-Null
-   Copy-Item -Path .\* -Destination $target -Recurse -Force
+   Copy-Item -Path .\src\* -Destination $target -Recurse -Force
    ```
 
 3. 重启 pi，扩展自动加载。
@@ -201,13 +201,13 @@ fi
 ```powershell
 $target = Join-Path $env:USERPROFILE ".pi\agent\extensions\pua"
 New-Item -ItemType Directory -Path $target -Force | Out-Null
-Copy-Item -Path .\* -Destination $target -Recurse -Force
+Copy-Item -Path .\src\* -Destination $target -Recurse -Force
 ```
 
 **Linux / macOS (bash)**
 ```bash
 mkdir -p ~/.pi/agent/extensions/pua
-cp -R ./* ~/.pi/agent/extensions/pua/
+cp -R ./src/* ~/.pi/agent/extensions/pua/
 ```
 
 ### 卸载
@@ -238,14 +238,14 @@ if (Test-Path -LiteralPath $target) {
     Remove-Item -LiteralPath $target -Recurse -Force
 }
 New-Item -ItemType Directory -Path $target -Force | Out-Null
-Copy-Item -Path .\* -Destination $target -Recurse -Force
+Copy-Item -Path .\src\* -Destination $target -Recurse -Force
 ```
 
 **Linux / macOS (bash)**
 ```bash
 rm -rf ~/.pi/agent/extensions/pua
 mkdir -p ~/.pi/agent/extensions/pua
-cp -R ./* ~/.pi/agent/extensions/pua/
+cp -R ./src/* ~/.pi/agent/extensions/pua/
 ```
 
 ---
@@ -254,7 +254,7 @@ cp -R ./* ~/.pi/agent/extensions/pua/
 
 如果你在**反复改源码、随改随看效果**，不要用方式一/二——那两种每改一次都要重新 `install` 或 `cp`，费劲且容易跟旧文件混。
 
-`pi -e <path>` 直接加载仓库里的 `index.ts`，**不复制、不写配置**；改完源码只需重启 pi 即生效。
+`pi -e <path>` 直接加载仓库里的 `src/index.ts`，**不复制、不写配置**；改完源码只需重启 pi 即生效。
 
 ### 启动调试会话
 
@@ -263,20 +263,20 @@ cp -R ./* ~/.pi/agent/extensions/pua/
 **Linux / macOS (bash)**
 ```bash
 cd /path/to/pi-pua-x      # 你的仓库目录
-pi -ne -e ./index.ts
+pi -ne -e ./src/index.ts
 ```
 
 **Windows (PowerShell)**
 ```powershell
 cd C:\path\to\pi-pua-x
-pi -ne -e .\index.ts
+pi -ne -e .\src\index.ts
 ```
 
 两个关键 flag：
 
 | flag | 作用 |
 |------|------|
-| `-e ./index.ts` | 加载指定扩展文件（可多次传入多个） |
+| `-e ./src/index.ts` | 加载指定扩展文件（可多次传入多个） |
 | `-ne` | 禁用全局扩展发现（显式 `-e` 仍生效）。**调试时必加**，否则会与已安装的正式版同时加载，造成命令/钩子重复冲突 |
 
 > ⚠️ **为什么必须加 `-ne`**：若你之前用方式一/二装过正式版（在 `~/.pi/agent/git/.../pi-pua-x/` 或 `~/.pi/agent/extensions/pua/`），pi 启动时会自动发现它。不加 `-ne` 就会和 `-e` 加载的调试版**双重加载**，出现重复命令注册报错。`-ne` 只屏蔽自动发现，你显式 `-e` 指定的仓库源码照常加载。
@@ -285,10 +285,10 @@ pi -ne -e .\index.ts
 
 ```bash
 # 1. 改源码后先跑语法验证（不启 pi 也能提前报错）
-node --experimental-strip-types --check index.ts
+node --experimental-strip-types --check src/index.ts
 
 # 2. 重启调试会话看效果
-pi -ne -e ./index.ts
+pi -ne -e ./src/index.ts
 
 # 3. 会话内验证扩展加载成功
 /pua-status
@@ -297,7 +297,7 @@ pi -ne -e ./index.ts
 需同时调试多个扩展时，`-e` 可重复：
 
 ```bash
-pi -ne -e ./index.ts -e /path/to/other-ext/index.ts
+pi -ne -e ./src/index.ts -e /path/to/other-ext/index.ts
 ```
 
 ### 调试与正式安装的关系
@@ -326,7 +326,7 @@ pi -ne -e ./index.ts -e /path/to/other-ext/index.ts
 
 **`pi install` 方式**
 1. 检查 `pi list` 中是否有 `git:github.com/xnightsky/pi-pua-x`。
-2. 确认目录存在：`ls ~/.pi/agent/git/github.com/xnightsky/pi-pua-x/index.ts`
+2. 确认目录存在：`ls ~/.pi/agent/git/github.com/xnightsky/pi-pua-x/src/index.ts`
 
 **手动安装方式**
 1. 扩展目录下是否有 `index.ts`：`ls ~/.pi/agent/extensions/pua/index.ts`
