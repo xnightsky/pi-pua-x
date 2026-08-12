@@ -2,7 +2,7 @@
 // 运行：node --experimental-strip-types --test integration-tests/references_loader.test.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadFlavorInfo, listFlavorKeys, normalizeFlavorKey, buildBehaviorProtocol } from "../references_loader.ts";
+import { loadFlavorInfo, listFlavorKeys, normalizeFlavorKey, buildBehaviorProtocol } from "../src/references_loader.ts";
 
 test("microsoft 味道已注册，name/icon 正确", () => {
   const f = loadFlavorInfo("microsoft");

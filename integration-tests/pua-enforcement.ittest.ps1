@@ -19,7 +19,7 @@ if ($Model -match '^([^/]+)/(.+)$' -and -not $Provider) {
 
 $HomeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
 $ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-$Ext = Join-Path $ScriptDir "..\index.ts"
+$Ext = Join-Path $ScriptDir "..\src\index.ts"
 $PuaDir = Join-Path $HomeDir ".pua"
 $Failed = 0
 $Passed = 0

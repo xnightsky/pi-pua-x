@@ -10,8 +10,7 @@
     "access": "public"
   },
   "files": [
-    "*.ts",
-    "*.js",
+    "src/",
     "INSTALL.md",
     "README.md",
     "README.zh.md",
@@ -22,7 +21,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "node --experimental-strip-types --import ./integration-tests/_register.mjs --test \"integration-tests/**/*.test.ts\"",
-    "check": "for f in *.ts; do case \"$f\" in *.d.ts) continue;; esac; node --experimental-strip-types --check \"$f\"; done && node --check capabilities.js"
+    "check": "for f in src/*.ts; do case \"$f\" in *.d.ts) continue;; esac; node --experimental-strip-types --check \"$f\"; done && node --check src/capabilities.js"
   },
   "repository": {
     "type": "git",
@@ -30,7 +29,7 @@
   },
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./src/index.ts"
     ]
   },
   "peerDependencies": {

@@ -36,7 +36,7 @@ fi
 
 # ── 路径常量 ──
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EXT="$SCRIPT_DIR/../index.ts"
+EXT="$SCRIPT_DIR/../src/index.ts"
 PUA_DIR="$HOME/.pua"
 PI_STATE="$HOME/.pi/agent/pua-state.json"
 FAILED=0

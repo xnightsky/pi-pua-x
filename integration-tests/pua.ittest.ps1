@@ -36,7 +36,7 @@ if ($Model)    { $PiModelArgs += "--model";    $PiModelArgs += $Model }
 # 路径常量
 $HomeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
 $ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
-$Ext = Join-Path $ScriptDir "..\index.ts"
+$Ext = Join-Path $ScriptDir "..\src\index.ts"
 $PuaDir = Join-Path $HomeDir ".pua"
 $PiState = Join-Path $HomeDir ".pi/agent/pua-state.json"
 $Failed = 0

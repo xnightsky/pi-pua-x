@@ -7,7 +7,7 @@ import {
   buildPatternBlock,
   shouldDeescalate,
   buildDeescalationBlock,
-} from "../failure_analysis.ts";
+} from "../src/failure_analysis.ts";
 
 // ── errorSignature ──
 test("errorSignature 提取首个错误样式行", () => {

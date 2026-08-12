@@ -19,7 +19,7 @@ const COUNT_FILE = join(PUA_DIR, ".failure_count");
 const STATE_FILE = join(tmpHome, ".pi", "agent", "pua-state.json");
 
 // 动态导入（env 设置后）
-const mod = await import("../index.ts");
+const mod = await import("../src/index.ts");
 
 after(() => {
   try { rmSync(tmpHome, { recursive: true, force: true }); } catch { /* 忽略 */ }
