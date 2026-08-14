@@ -85,6 +85,8 @@ interface PuaState {
   pendingBreakthrough: { fromLevel: number; afterFailures: number } | null;
   /** 当前模型是否在禁用列表中（L2 完全禁用时跳过所有 hook） */
   modelDisabled: boolean;
+  /** 本会话是否已注入过“模型禁用一次性声明”（只注入一次，避免每轮占用上下文） */
+  disableNoticeInjected: boolean;
 }
 
 /** 默认运行时状态 */
@@ -97,6 +99,7 @@ const DEFAULT_STATE: PuaState = {
   peakLevel: 0,
   pendingBreakthrough: null,
   modelDisabled: false,
+  disableNoticeInjected: false,
 };
 
 /** 当前用户 Home 目录（跨平台兼容） */
@@ -303,6 +306,26 @@ function hasPuaSkill(): boolean {
 }
 
 /**
+ * 构建“模型禁用一次性声明”文本。
+ *
+ * 用途：当前模型命中 disabled_models 时，在会话首次 before_agent_start 注入，
+ * 防止模型通过技能目录自加载 pua skill 并启用其方法论（扩展门控管不到该路径）。
+ *
+ * 约束（反启动效应）：文本只声明被禁止的行为与替代路径，
+ * 不得引用方法论的任何具体标记、话术或格式字面量——负向指令中引用被禁形态
+ * 会对模型产生 priming，反而提高其输出概率。
+ *
+ * @param modelId - 当前模型标识（{provider}/{id}）
+ * @returns 注入用声明文本
+ */
+function buildDisableNotice(modelId: string): string {
+  return [
+    `[PUA] 当前模型 ${modelId} 已在 PUA 配置（disabled_models）中标记为免注入模型。`,
+    "请勿加载或启用 pua skill 的行为方法论与话术体系；遇到失败按常规工程方式复盘推进即可。",
+  ].join("\n");
+}
+
+/**
  * pi 扩展入口函数。
  *
  * 注册会话生命周期钩子、四条用户命令，以及 tool_result / tool_call / before_agent_start 事件监听，
@@ -344,6 +367,7 @@ export default function (pi: ExtensionAPI) {
       peakLevel: piExt.peakLevel,
       pendingBreakthrough: piExt.pendingBreakthrough,
       modelDisabled: false,
+      disableNoticeInjected: false,
     };
     enforcementConfig = resolveEnforcementConfig(config as any);
   }
@@ -976,7 +1000,18 @@ export default function (pi: ExtensionAPI) {
     const disabledModels = getDisabledModels(modelCheckCfg);
     const modelId = formatModelId(ctx.model);
     state.modelDisabled = modelId ? isModelDisabled(modelId, disabledModels) : false;
-    if (state.modelDisabled) return undefined;
+    if (state.modelDisabled) {
+      // 禁用模型的一次性防御声明：扩展 hook 虽已静默，但 pua skill 仍列在技能目录中，
+      // 模型失败后可能自行 read SKILL.md 并启用其方法论（绕过扩展门控）。
+      // 故在会话首次挂载输入时注入一条极简声明，明示该模型禁用 PUA、不要启用 skill 方法论。
+      // 注意：声明文本不得引用方法论的任何具体标记/话术字面量（负向指令的启动效应会反向唤醒），
+      // 只禁止行为本身并给出替代路径。
+      if (!state.disableNoticeInjected && hasPuaSkill()) {
+        state.disableNoticeInjected = true;
+        return { systemPrompt: event.systemPrompt + "\n\n" + buildDisableNotice(modelId) };
+      }
+      return undefined;
+    }
 
     const capabilitySnapshot = await getCapabilitySnapshot(event);
 

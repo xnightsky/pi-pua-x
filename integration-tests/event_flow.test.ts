@@ -171,3 +171,39 @@ test("不足 3 次失败后成功不触发突破", async () => {
   const prompt = await agentStart(handlers, ctx);
   assert.doesNotMatch(prompt, /突破/);
 });
+
+test("禁用模型：首次挂载注入一次性禁用声明，之后完全静默", async () => {
+  const { handlers, ctx } = await freshHarness();
+  // freshHarness 写入的 config 不含 disabled_models；before_agent_start 每次重读配置，直接覆盖即可
+  writeFileSync(
+    join(PUA_DIR, "config.json"),
+    JSON.stringify({ always_on: true, disabled_models: ["*/k3-*"] }),
+    "utf-8",
+  );
+  const disabledCtx = { ...ctx, model: { provider: "kimi-coding", id: "k3-256k" } };
+
+  const prompt1 = await agentStart(handlers, disabledCtx);
+  assert.match(prompt1, /免注入模型/, "首次应注入禁用声明");
+  assert.match(prompt1, /kimi-coding\/k3-256k/, "声明应含当前模型 id");
+  // 反启动效应：声明不得引用方法论的具体标记/协议字面量，也不得夹带完整协议
+  assert.doesNotMatch(prompt1, /自动选择|PUA-DIAGNOSIS|三条红线|四权/, "声明不得含方法论字面量或完整协议");
+
+  const prompt2 = await agentStart(handlers, disabledCtx);
+  assert.equal(prompt2, "BASE", "第二次起应完全静默");
+});
+
+test("禁用模型：tool_result 失败不计数（门控同步生效）", async () => {
+  const { handlers, ctx } = await freshHarness();
+  writeFileSync(
+    join(PUA_DIR, "config.json"),
+    JSON.stringify({ always_on: true, disabled_models: ["*/k3-*"] }),
+    "utf-8",
+  );
+  const disabledCtx = { ...ctx, model: { provider: "kimi-coding", id: "k3-256k" } };
+
+  await agentStart(handlers, disabledCtx); // 触发 modelDisabled 判定
+  await bashFail(handlers, disabledCtx, "error: should_not_count");
+  // 门控生效时计数器根本不落盘；若存在也必须为 0
+  const count = existsSync(COUNT_FILE) ? readFileSync(COUNT_FILE, "utf-8").trim() : "0";
+  assert.equal(count, "0", "禁用模型的失败不应计数");
+});
