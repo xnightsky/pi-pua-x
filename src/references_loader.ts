@@ -13,7 +13,8 @@
  *   1. ~/.agents/skills/pua/       — 通用 agents 目录
  *   2. ~/.pi/agent/skills/pua/     — pi agent skill 目录
  *   3. ~/.codex/skills/pua/        — legacy CLI 兼容
- *   4. process.cwd()/.agents/skills/pua/  — 项目级
+ *   4. <cwd> 及其祖先链/.agents/skills/pua/ — 项目级（与 pi 的
+ *      collectAncestorAgentsSkillDirs 对齐：从 cwd 向上逐级收集，遇 git root 即止）
  *   5. process.cwd()/.pi/skills/pua/      — 项目级
  *
  * 本 loader 优先从 skill references/ 读取，文件缺失时走内置 fallback。
@@ -21,7 +22,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 
 // ═══════════════════════════════════════════════════════════════
@@ -61,8 +62,43 @@ export interface PressurePrompts {
 const SKILL_NAME = "pua";
 
 /**
+ * 向上查找包含 `.git` 的目录（git 仓库根）。
+ * @param startDir - 起始目录
+ * @returns git root 绝对路径；未找到返回 `null`
+ */
+function findGitRoot(startDir: string): string | null {
+  let dir = resolve(startDir);
+  while (true) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/**
+ * 收集 cwd 祖先链上的 `.agents/skills` 目录。
+ * 与 pi 的 `collectAncestorAgentsSkillDirs`（package-manager.js）对齐：
+ * 从 startDir 逐级向上，遇到 git root 收集后停止；无 git root 则一直到文件系统根。
+ * 用途：pi 会把祖先链上每一级 `.agents/skills` 都放进技能目录，
+ * 若 pua skill 装在 monorepo 父目录/git root 而此处不跟随，
+ * hasPuaSkill 会漏判，导致禁用模型的防御声明不注入。
+ */
+function collectAncestorAgentsSkillDirs(startDir: string): string[] {
+  const dirs: string[] = [];
+  const gitRoot = findGitRoot(startDir);
+  let dir = resolve(startDir);
+  while (true) {
+    dirs.push(join(dir, ".agents", "skills"));
+    if ((gitRoot !== null && dir === gitRoot) || dirname(dir) === dir) break;
+    dir = dirname(dir);
+  }
+  return dirs;
+}
+
+/**
  * 按优先级嗅探可能的 skill 安装目录。
- * 仅返回包含 `SKILL.md` 的候选路径。
+ * 返回包含 `SKILL.md` 或 `references/` 的候选路径（去重后）。
  */
 export function findSkillDirs(): string[] {
   const home = homedir();
@@ -72,17 +108,21 @@ export function findSkillDirs(): string[] {
     join(home, ".pi", "agent", "skills", SKILL_NAME),
     // legacy CLI 目录兼容
     join(home, ".codex", "skills", SKILL_NAME),
-    // 项目级目录
-    join(process.cwd(), ".agents", "skills", SKILL_NAME),
+    // 项目级目录：cwd 祖先链的 .agents/skills（与 pi 的技能发现对齐）
+    ...collectAncestorAgentsSkillDirs(process.cwd()).map((d) => join(d, SKILL_NAME)),
     join(process.cwd(), ".pi", "skills", SKILL_NAME),
   ];
   // 判定条件：SKILL.md 或 references/ 任一存在即视为有效 skill 目录。
   // 有些用户只 sync 了 references 而未拷贝 SKILL.md（上游两者并列），
   // 且目录可能是 symlink（pi 自身支持 symlink 加载 skill），
   // existsSync 会自动 follow symlink。
-  return candidates.filter((d) =>
-    existsSync(join(d, "SKILL.md")) || existsSync(join(d, "references")),
-  );
+  const seen = new Set<string>();
+  return candidates.filter((d) => {
+    const key = resolve(d);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return existsSync(join(d, "SKILL.md")) || existsSync(join(d, "references"));
+  });
 }
 
 /**
