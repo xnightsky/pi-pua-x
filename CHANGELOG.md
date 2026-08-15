@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.6.0
+
+### Added
+
+- **禁用模型防御声明**：模型命中 `disabled_models` 时，除 hook 全静默外，每次 `before_agent_start` 往 system prompt 注入极简声明，防止模型从 pi 技能目录（`<available_skills>`，lazy-load）自行 `read` pua 的 SKILL.md 绕过门控；声明不引用方法论字面量（反启动效应），模型切换时 id 自动跟随。
+- **`pua-disable-notice` 集成测试**（`integration-tests/pua-disable-notice.ittest.ps1` / `.sh`）：真实 token 端到端验证禁用声明注入、对照组不注入、禁用模型工具失败不计数；临时目录桩 skill + 配置备份恢复，默认 `deepseek/deepseek-v4-flash`。
+- **pi-subagents 联用文档**：子进程默认 ambient 加载本扩展并独立重做门控（实测 v0.50.0）；模型层缺口建议用 `subagents.modelScope` 白名单收敛。
+
+### Fixed
+
+- **禁用声明由一次性注入改为每次注入**：pi 在每个用户 prompt 时若扩展不返回 `systemPrompt` 会把系统提示重置回 base，一次性注入只覆盖到下一次 prompt 为止。
+- **`findSkillDirs` 祖先目录链对齐 pi 技能发现**：向上收集 `.agents/skills` 至 git root（对齐 pi `collectAncestorAgentsSkillDirs`），修复 pua skill 装在 monorepo 父目录时 `hasPuaSkill()` 漏判导致声明不注入。
+
+### Changed
+
+- **`peerDependencies` 迁移至 `@earendil-works/pi-coding-agent`**：pi 已换发布包名（旧名 `@mariozechner/pi-coding-agent` 停更于 0.73.1）；文档中失效的 `nicepkg/pi-coding-agent` 仓库链接改为 `earendil-works/pi`。
+
 ## v0.5.0
 
 ### Changed
