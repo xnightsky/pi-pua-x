@@ -1,26 +1,32 @@
 # pi-pua-x
 
+[![npm version](https://img.shields.io/npm/v/@xnightsky/pi-pua-x)](https://www.npmjs.com/package/@xnightsky/pi-pua-x)
+[![npm downloads](https://img.shields.io/npm/dm/@xnightsky/pi-pua-x)](https://www.npmjs.com/package/@xnightsky/pi-pua-x)
+[![license](https://img.shields.io/npm/l/@xnightsky/pi-pua-x)](./LICENSE)
+
 > English | [中文版本](./README.zh.md)
 
 Stateful PUA runtime extension for [pi](https://github.com/earendil-works/pi) — lifecycle hooks, pressure escalation, capability-aware enhancement, and subagent inheritance. Built on [tanweai/pua](https://github.com/tanweai/pua).
 
 ## What is this?
 
-`pi-pua-x` is the **programmatic runtime** for the PUA behavioral protocol in pi. Unlike static skill files that rely on the model to "remember" rules, this extension uses pi's lifecycle hooks to deterministically enforce behavior:
+`pi-pua-x` is the **programmatic runtime** for the PUA behavioral protocol in pi. Unlike static skill files that rely on the model to "remember" rules, this extension uses pi's lifecycle hooks to deterministically enforce behavior.
 
-> ## ⚠️ Two modules: this replaces **hooks only**, NOT the skill
->
-> PUA ships as **two separate modules**. You need **both** for the full experience:
->
-> | Module | What it is | Who maintains it | Provided by `pi-pua-x`? |
-> |--------|-----------|------------------|--------------------------|
-> | **skill** | Static rule files (`SKILL.md` + `references/`: flavors, methodologies). The model *reads* these for PUA culture/content. | Upstream [`tanweai/pua`](https://github.com/tanweai/pua) — full version for Claude Code, minimal for other CLIs | ❌ **No** |
-> | **hooks** | Programmatic runtime (lifecycle hooks, failure tracking, pressure escalation, enforcement). | Officially **only the hooks** are maintained as a pi adapter; `pi-pua-x` is the enhanced replacement. | ✅ **Yes (this repo)** |
->
-> **This is why you still install/sync the official `tanweai/pua` skill after installing `pi-pua-x`:**
-> `pi-pua-x` replaces only the **hooks** half. The **skill** half (the actual flavor/methodology text the model reads) still comes from upstream `tanweai/pua`. Without the skill, the hooks run but the model has no rule content to act on (the extension falls back to a built-in minimal set and auto-disables PUA if no skill is found).
->
-> ➡️ Install order: **(1)** deploy the `tanweai/pua` skill → **(2)** install `pi-pua-x` (hooks) → **(3)** run `/pua-x-sync-skills` to keep the skill's `references/` up to date. See [INSTALL.md](./INSTALL.md).
+## Two modules: hooks + skill
+
+PUA ships as **two separate modules**, and you need **both** for the full experience:
+
+| Module | What it is | Who maintains it | Provided by `pi-pua-x`? |
+|--------|-----------|------------------|--------------------------|
+| **skill** | Static rule files (`SKILL.md` + `references/`: flavors, methodologies). The model *reads* these for PUA culture/content. | Upstream [`tanweai/pua`](https://github.com/tanweai/pua) — full version for Claude Code, minimal for other CLIs | ❌ No |
+| **hooks** | Programmatic runtime (lifecycle hooks, failure tracking, pressure escalation, enforcement). | Officially only the hooks are maintained as a pi adapter; `pi-pua-x` is the enhanced replacement. | ✅ Yes (this repo) |
+
+> ⚠️ **This is why you still need the official `tanweai/pua` skill after installing `pi-pua-x`:**
+> `pi-pua-x` replaces only the **hooks** half. The **skill** half — the actual flavor/methodology text the model reads — still comes from upstream. Without it, the hooks run but the model has no rule content to act on (the extension falls back to a built-in minimal set and auto-disables PUA if no skill is found).
+
+**Install order:** **(1)** deploy the `tanweai/pua` skill → **(2)** install `pi-pua-x` (hooks) → **(3)** run `/pua-x-sync-skills` to keep the skill's `references/` up to date. See [INSTALL.md](./INSTALL.md).
+
+## How it works
 
 | Capability | How |
 |-----------|-----|
@@ -46,9 +52,7 @@ The official pi adapter (~100 lines) does basic prompt injection and counting. T
 
 ## Install
 
-> **所有安装方式、配置说明、命令参考、基线插件和故障排查，请参见 [INSTALL.md](./INSTALL.md)。**
->
-> README 中不再重复安装步骤，避免文档双轨维护导致信息不一致。
+All install methods, configuration, command reference, baseline plugins, and troubleshooting live in [INSTALL.md](./INSTALL.md). Install steps are deliberately not duplicated here — one source of truth, no doc drift.
 
 ## Commands
 
@@ -61,9 +65,9 @@ The official pi adapter (~100 lines) does basic prompt injection and counting. T
 | `/pua-model list` | List model patterns excluded from PUA |
 | `/pua-model disable <pattern>` | Disable PUA for a model pattern (e.g. `anthropic/claude-opus*`) |
 | `/pua-model restore <pattern>` | Restore PUA for a model pattern (remove it from the exclusion list) |
-| `/pua-x-sync-skills` | Sync the **skill module's** upstream tanweai/pua references (flavors, methodologies, etc.). This extension is the *hooks* module and does not bundle the skill — see the **Two modules** callout near the top of this README. |
+| `/pua-x-sync-skills` | Sync the **skill module's** upstream tanweai/pua references (flavors, methodologies, etc.). This extension is the *hooks* module and does not bundle the skill — see **Two modules** above. |
 
-## Model Compatibility
+## Model compatibility
 
 PUA works by **verbal pressure + deterministic hook enforcement**. Newer frontier models are explicitly trained to resist emotional manipulation — which is exactly what PUA-style pressure is:
 
@@ -72,7 +76,9 @@ PUA works by **verbal pressure + deterministic hook enforcement**. Newer frontie
 - **Upstream `tanweai/pua` has no per-model compatibility matrix (compat is per-platform)**, but the community consistently observes PUA "not triggering / not performing" on Opus-class models, which have lower compliance with pressure-style prompts. On top of that, Opus 4.8's tool-call serialization bugs (anthropics/claude-code #67307, #63481) can break the deterministic hook chain this runtime depends on — failure at the engineering level, not just the persuasion level.
 - **High-tier models need PUA less** (inference, not official statement): high-agency behavior (not giving up, exhausting options, verifying before claiming done) is already their default trained behavior. External pressure adds no behavioral gain — it is just noise in the context window.
 
-Consequence: on these models, PUA injection is **ineffective or even harmful** — wasted tokens and eroded trust, with no behavioral gain. `/pua-model` makes PUA **on-demand**: keep it enabled for models where it adds real behavioral gain, and exclude high-tier models (glob patterns, e.g. `anthropic/claude-opus*`) that neither respond to pressure nor need it. Excluded models get **L2 full disable**: no protocol injection, no hooks — plus a minimal notice appended on every `before_agent_start` (pi resets the system prompt to base on each user prompt, so a one-shot notice would lapse) telling the model not to self-load the pua skill from pi's skills catalog, the one path hooks can't gate. Matching logic: [docs/DESIGN.md](./docs/DESIGN.md).
+**Consequence**: on these models, PUA injection is **ineffective or even harmful** — wasted tokens and eroded trust, with no behavioral gain.
+
+`/pua-model` makes PUA **on-demand**: keep it enabled for models where it adds real behavioral gain, and exclude high-tier models (glob patterns, e.g. `anthropic/claude-opus*`) that neither respond to pressure nor need it. Excluded models get **L2 full disable** — no protocol injection, no hooks — plus a minimal notice on every `before_agent_start` telling the model not to self-load the pua skill from pi's skills catalog (the one path hooks can't gate). The notice is re-injected on every prompt because pi resets the system prompt to base per user prompt, so a one-shot notice would lapse. Matching logic: [docs/DESIGN.md](./docs/DESIGN.md).
 
 ## Configuration
 
@@ -90,7 +96,7 @@ Consequence: on these models, PUA injection is **ineffective or even harmful** �
 }
 ```
 
-## Supported Flavors
+## Supported flavors
 
 alibaba (default), bytedance, huawei, tencent, baidu, pinduoduo, meituan, jd, xiaomi, netflix, tesla/musk, apple/jobs, amazon
 
@@ -105,33 +111,27 @@ alibaba (default), bytedance, huawei, tencent, baidu, pinduoduo, meituan, jd, xi
 | [docs/RECOMMENDATIONS.md](./docs/RECOMMENDATIONS.md) | Recommended PI plugin combinations |
 | [docs/research/model-compat.md](./docs/research/model-compat.md) | Research evidence: why newer models resist PUA and per-model disabling exists |
 
-## File Structure
+## File structure
 
 ```
 pi-pua-x/
-├── src/                     # Runtime sources
-│   ├── index.ts             # Extension entry point
-│   ├── capabilities.js      # Capability snapshot + enhancement prompts
-│   ├── enforcement.ts       # 4 enforcement hooks logic
-│   ├── failure_analysis.ts  # Pattern-aware failure analysis
-│   ├── model_rules.ts       # Per-model PUA toggle (wildcard matching)
-│   ├── references_loader.ts # Flavor/methodology/pressure loader
-│   └── global.d.ts          # Type stubs for PI extension API
-├── tsconfig.json            # TypeScript config (noEmit, type-check only)
-├── INSTALL.md               # Installation guide
-├── bin/
-│   ├── sync-pua-references.sh
-│   └── sync-pua-references.ps1
-├── docs/
-│   ├── CAPABILITIES.md
-│   ├── DESIGN.md
-│   ├── RECOMMENDATIONS.md
-│   ├── UPSTREAM.md
-│   └── plans/
-└── integration-tests/
-    ├── pua.ittest.sh        # Integration test (bash)
-    ├── pua.ittest.ps1       # Integration test (PowerShell)
-    └── pua-enforcement.ittest.ps1
+├── src/                                # Runtime sources
+│   ├── index.ts                        # Extension entry point
+│   ├── capabilities.js                 # Capability snapshot + enhancement prompts
+│   ├── enforcement.ts                  # 4 enforcement hooks logic
+│   ├── failure_analysis.ts             # Pattern-aware failure analysis
+│   ├── model_rules.ts                  # Per-model PUA toggle (wildcard matching)
+│   ├── references_loader.ts            # Flavor/methodology/pressure loader
+│   └── global.d.ts                     # Type stubs for PI extension API
+├── bin/                                # Upstream references sync (bash + PowerShell)
+├── docs/                               # Design, capabilities, upstream, research
+├── integration-tests/
+│   ├── *.test.ts                       # node:test unit + mock-pi event-flow tests (npm test)
+│   ├── pua.ittest.sh / .ps1            # Core integration tests (real tokens)
+│   ├── pua-enforcement.ittest.ps1      # Enforcement hooks tests
+│   └── pua-disable-notice.ittest.*     # Disabled-model notice tests
+├── INSTALL.md                          # Installation guide
+└── tsconfig.json                       # TypeScript config (noEmit, type-check only)
 ```
 
 ## License

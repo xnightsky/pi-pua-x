@@ -1,26 +1,32 @@
 # pi-pua-x
 
+[![npm version](https://img.shields.io/npm/v/@xnightsky/pi-pua-x)](https://www.npmjs.com/package/@xnightsky/pi-pua-x)
+[![npm downloads](https://img.shields.io/npm/dm/@xnightsky/pi-pua-x)](https://www.npmjs.com/package/@xnightsky/pi-pua-x)
+[![license](https://img.shields.io/npm/l/@xnightsky/pi-pua-x)](./LICENSE)
+
 > [英文版本](./README.md) | 中文版本
 
 [pi](https://github.com/earendil-works/pi) 的状态化 PUA 运行时扩展 —— 生命周期钩子、压力升级、能力感知增强与子代理继承。基于 [tanweai/pua](https://github.com/tanweai/pua) 构建。
 
 ## 这是什么？
 
-`pi-pua-x` 是 pi 中 PUA 行为协议的**程序化运行时**。与依赖模型"记住"规则的静态技能文件不同，此扩展利用 pi 的生命周期钩子以确定性方式强制执行行为：
+`pi-pua-x` 是 pi 中 PUA 行为协议的**程序化运行时**。与依赖模型"记住"规则的静态技能文件不同，此扩展利用 pi 的生命周期钩子以确定性方式强制执行行为。
 
-> ## ⚠️ 两个模块：本扩展只替换 **hooks**，不替换 **skill**
->
-> PUA 由**两个独立模块**组成，完整体验**两者缺一不可**：
->
-> | 模块 | 是什么 | 谁维护 | `pi-pua-x` 提供？ |
-> |------|--------|--------|---------------------|
-> | **skill** | 静态规则文件（`SKILL.md` + `references/`：flavors、methodology）。模型**读取**这些文件获取 PUA 文化/内容。 | 上游 [`tanweai/pua`](https://github.com/tanweai/pua) —— Claude Code 用完整版，其他 CLI 用最小版 | ❌ **否** |
-> | **hooks** | 程序化运行时（生命周期钩子、失败追踪、压力升级、强制执行）。 | 官方**只维护 hooks** 作为 pi 适配器；`pi-pua-x` 是其增强替代版。 | ✅ **是（本仓库）** |
->
-> **这就是为什么装了 `pi-pua-x` 之后，你还需要安装/同步官方 `tanweai/pua` skill：**
+## 两个模块：hooks + skill
+
+PUA 由**两个独立模块**组成，完整体验**两者缺一不可**：
+
+| 模块 | 是什么 | 谁维护 | `pi-pua-x` 提供？ |
+|------|--------|--------|---------------------|
+| **skill** | 静态规则文件（`SKILL.md` + `references/`：flavors、methodology）。模型**读取**这些文件获取 PUA 文化/内容。 | 上游 [`tanweai/pua`](https://github.com/tanweai/pua) —— Claude Code 用完整版，其他 CLI 用最小版 | ❌ 否 |
+| **hooks** | 程序化运行时（生命周期钩子、失败追踪、压力升级、强制执行）。 | 官方**只维护 hooks** 作为 pi 适配器；`pi-pua-x` 是其增强替代版。 | ✅ 是（本仓库） |
+
+> ⚠️ **这就是为什么装了 `pi-pua-x` 之后，你还需要安装/同步官方 `tanweai/pua` skill：**
 > `pi-pua-x` 只替换了 **hooks** 那一半。**skill** 那一半（模型实际读取的 flavor/methodology 文本）仍由上游 `tanweai/pua` 提供。没有 skill，hooks 照跑，但模型没有规则内容可依据（扩展会回退到内置最小集；若完全找不到 skill 则会自动禁用 PUA）。
->
-> ➡️ 安装顺序：**（1）** 部署 `tanweai/pua` skill → **（2）** 安装 `pi-pua-x`（hooks）→ **（3）** 运行 `/pua-x-sync-skills` 保持 skill 的 `references/` 更新。详见 [INSTALL.md](./INSTALL.md)。
+
+**安装顺序：** **（1）** 部署 `tanweai/pua` skill → **（2）** 安装 `pi-pua-x`（hooks）→ **（3）** 运行 `/pua-x-sync-skills` 保持 skill 的 `references/` 更新。详见 [INSTALL.md](./INSTALL.md)。
+
+## 工作原理
 
 | 能力 | 实现方式 |
 |-----------|-----|
@@ -46,9 +52,7 @@
 
 ## 安装
 
-> **所有安装方式、配置说明、命令参考、基线插件和故障排查，请参见 [INSTALL.md](./INSTALL.md)。**
->
-> README 中不再重复安装步骤，避免文档双轨维护导致信息不一致。
+所有安装方式、配置说明、命令参考、基线插件和故障排查，请参见 [INSTALL.md](./INSTALL.md)。README 中不再重复安装步骤——单一信息源，避免文档双轨漂移。
 
 ## 命令
 
@@ -61,7 +65,7 @@
 | `/pua-model list` | 列出被排除 PUA 的模型模式 |
 | `/pua-model disable <pattern>` | 禁用指定模型的 PUA（如 `anthropic/claude-opus*`） |
 | `/pua-model restore <pattern>` | 恢复指定模型的 PUA（移出禁用列表） |
-| `/pua-x-sync-skills` | 同步 **skill 模块**的上游 tanweai/pua references（flavors、methodology 等）。本扩展是 *hooks* 模块，不捆绑 skill —— 见本 README 顶部的**「两个模块」**高亮说明。 |
+| `/pua-x-sync-skills` | 同步 **skill 模块**的上游 tanweai/pua references（flavors、methodology 等）。本扩展是 *hooks* 模块，不捆绑 skill —— 见上方**「两个模块」**说明。 |
 
 ## 模型兼容性
 
@@ -72,7 +76,9 @@ PUA 的生效依赖「话语施压 + 确定性 hook 强制」。新一代前沿�
 - **上游 `tanweai/pua` 没有按模型的兼容性矩阵（兼容性按平台划分）**，但社区普遍观察到 Opus 系列上 PUA「不触发 / 不表演」——Opus 对施压式话术的顺从度更低。此外，Opus 4.8 的工具调用序列化缺陷（anthropics/claude-code #67307、#63481）会破坏本运行时依赖的确定性 hook 链路——这是**工程层**的失效，而不只是说服层失效。
 - **高阶模型对 PUA 的依赖本身也在下降**（推论，非官方表述）：高自主性（不放弃、穷尽方案、验证后才宣称完成）已是它们的默认训练行为，外部施压换不来额外行为增益，只是上下文里的噪音。
 
-结论：在这些模型上，PUA 注入**要么无效、要么有害**——白白消耗 token、损耗信任，却换不来行为收益。`/pua-model` 让 PUA 成为**按需开关**：在真正能获得行为增益的模型上保持开启，对既不响应施压也不需要它的高阶模型（glob 模式，如 `anthropic/claude-opus*`）直接排除。被禁用的模型执行 **L2 完全禁用**：不注入协议、不挂任何 hook；另在每次 `before_agent_start` 注入一条极简禁用声明（pi 每个用户 prompt 会把 system prompt 重置回 base，一次性注入会失效），明示该模型免注入、不要从 pi 技能目录自行加载 pua skill（hook 门控管不到的唯一路径）。匹配逻辑详见 [docs/DESIGN.md](./docs/DESIGN.md)。
+**结论**：在这些模型上，PUA 注入**要么无效、要么有害**——白白消耗 token、损耗信任，却换不来行为收益。
+
+`/pua-model` 让 PUA 成为**按需开关**：在真正能获得行为增益的模型上保持开启，对既不响应施压也不需要它的高阶模型（glob 模式，如 `anthropic/claude-opus*`）直接排除。被禁用的模型执行 **L2 完全禁用**——不注入协议、不挂任何 hook——并在每次 `before_agent_start` 注入一条极简禁用声明，明示该模型免注入、不要从 pi 技能目录自行加载 pua skill（hook 门控管不到的唯一路径）。声明每次 prompt 重新注入，因为 pi 会把 system prompt 重置回 base，一次性注入会失效。匹配逻辑详见 [docs/DESIGN.md](./docs/DESIGN.md)。
 
 ## 配置
 
@@ -109,29 +115,23 @@ alibaba（默认）、bytedance、huawei、tencent、baidu、pinduoduo、meituan
 
 ```
 pi-pua-x/
-├── src/                     # 运行时源码
-│   ├── index.ts             # 扩展入口
-│   ├── capabilities.js      # 能力快照 + 增强提示
-│   ├── enforcement.ts       # 4 个强制执行钩子逻辑
-│   ├── failure_analysis.ts  # 模式感知失败分析
-│   ├── model_rules.ts       # 模型粒度 PUA 开关（通配符匹配）
-│   ├── references_loader.ts # 风味/方法论/压力加载器
-│   └── global.d.ts          # PI 扩展 API 的类型存根
-├── tsconfig.json            # TypeScript 配置（仅类型检查，不输出）
-├── INSTALL.md               # 安装指南
-├── bin/
-│   ├── sync-pua-references.sh
-│   └── sync-pua-references.ps1
-├── docs/
-│   ├── CAPABILITIES.md
-│   ├── DESIGN.md
-│   ├── RECOMMENDATIONS.md
-│   ├── UPSTREAM.md
-│   └── plans/
-└── integration-tests/
-    ├── pua.ittest.sh        # 集成测试（bash）
-    ├── pua.ittest.ps1       # 集成测试（PowerShell）
-    └── pua-enforcement.ittest.ps1
+├── src/                                # 运行时源码
+│   ├── index.ts                        # 扩展入口
+│   ├── capabilities.js                 # 能力快照 + 增强提示
+│   ├── enforcement.ts                  # 4 个强制执行钩子逻辑
+│   ├── failure_analysis.ts             # 模式感知失败分析
+│   ├── model_rules.ts                  # 模型粒度 PUA 开关（通配符匹配）
+│   ├── references_loader.ts            # 风味/方法论/压力加载器
+│   └── global.d.ts                     # PI 扩展 API 的类型存根
+├── bin/                                # 上游 references 同步（bash + PowerShell）
+├── docs/                               # 设计、能力、上游、调研文档
+├── integration-tests/
+│   ├── *.test.ts                       # node:test 单测 + mock-pi 事件流测试（npm test）
+│   ├── pua.ittest.sh / .ps1            # 核心集成测试（真实 token）
+│   ├── pua-enforcement.ittest.ps1      # 强制执行钩子测试
+│   └── pua-disable-notice.ittest.*     # 禁用模型声明测试
+├── INSTALL.md                          # 安装指南
+└── tsconfig.json                       # TypeScript 配置（仅类型检查，不输出）
 ```
 
 ## 许可证
