@@ -85,8 +85,6 @@ interface PuaState {
   pendingBreakthrough: { fromLevel: number; afterFailures: number } | null;
   /** 当前模型是否在禁用列表中（L2 完全禁用时跳过所有 hook） */
   modelDisabled: boolean;
-  /** 本会话是否已注入过“模型禁用一次性声明”（只注入一次，避免每轮占用上下文） */
-  disableNoticeInjected: boolean;
 }
 
 /** 默认运行时状态 */
@@ -99,7 +97,6 @@ const DEFAULT_STATE: PuaState = {
   peakLevel: 0,
   pendingBreakthrough: null,
   modelDisabled: false,
-  disableNoticeInjected: false,
 };
 
 /** 当前用户 Home 目录（跨平台兼容） */
@@ -306,10 +303,12 @@ function hasPuaSkill(): boolean {
 }
 
 /**
- * 构建“模型禁用一次性声明”文本。
+ * 构建“模型禁用声明”文本。
  *
- * 用途：当前模型命中 disabled_models 时，在会话首次 before_agent_start 注入，
+ * 用途：当前模型命中 disabled_models 时，在每次 before_agent_start 注入，
  * 防止模型通过技能目录自加载 pua skill 并启用其方法论（扩展门控管不到该路径）。
+ * 必须每次注入：pi 在用户 prompt 时若扩展不返回 systemPrompt 会把系统提示
+ * 重置回 base（含技能目录），只注入一次会导致后续 prompt 零防御。
  *
  * 约束（反启动效应）：文本只声明被禁止的行为与替代路径，
  * 不得引用方法论的任何具体标记、话术或格式字面量——负向指令中引用被禁形态
@@ -367,7 +366,6 @@ export default function (pi: ExtensionAPI) {
       peakLevel: piExt.peakLevel,
       pendingBreakthrough: piExt.pendingBreakthrough,
       modelDisabled: false,
-      disableNoticeInjected: false,
     };
     enforcementConfig = resolveEnforcementConfig(config as any);
   }
@@ -1001,13 +999,14 @@ export default function (pi: ExtensionAPI) {
     const modelId = formatModelId(ctx.model);
     state.modelDisabled = modelId ? isModelDisabled(modelId, disabledModels) : false;
     if (state.modelDisabled) {
-      // 禁用模型的一次性防御声明：扩展 hook 虽已静默，但 pua skill 仍列在技能目录中，
+      // 禁用模型的防御声明：扩展 hook 虽已静默，但 pua skill 仍列在技能目录中，
       // 模型失败后可能自行 read SKILL.md 并启用其方法论（绕过扩展门控）。
-      // 故在会话首次挂载输入时注入一条极简声明，明示该模型禁用 PUA、不要启用 skill 方法论。
+      // 故在每次 before_agent_start 注入一条极简声明，明示该模型禁用 PUA、不要启用 skill 方法论。
+      // 必须每次注入：pi 在扩展不返回 systemPrompt 时会把系统提示重置回 base，
+      // 一次性注入只能覆盖到下一次用户 prompt 为止。
       // 注意：声明文本不得引用方法论的任何具体标记/话术字面量（负向指令的启动效应会反向唤醒），
       // 只禁止行为本身并给出替代路径。
-      if (!state.disableNoticeInjected && hasPuaSkill()) {
-        state.disableNoticeInjected = true;
+      if (hasPuaSkill()) {
         return { systemPrompt: event.systemPrompt + "\n\n" + buildDisableNotice(modelId) };
       }
       return undefined;

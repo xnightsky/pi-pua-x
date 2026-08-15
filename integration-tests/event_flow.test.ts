@@ -172,7 +172,7 @@ test("不足 3 次失败后成功不触发突破", async () => {
   assert.doesNotMatch(prompt, /突破/);
 });
 
-test("禁用模型：首次挂载注入一次性禁用声明，之后完全静默", async () => {
+test("禁用模型：每次挂载均注入禁用声明（pi 会重置 systemPrompt，一次性注入会失效）", async () => {
   const { handlers, ctx } = await freshHarness();
   // freshHarness 写入的 config 不含 disabled_models；before_agent_start 每次重读配置，直接覆盖即可
   writeFileSync(
@@ -188,8 +188,14 @@ test("禁用模型：首次挂载注入一次性禁用声明，之后完全静�
   // 反启动效应：声明不得引用方法论的具体标记/协议字面量，也不得夹带完整协议
   assert.doesNotMatch(prompt1, /自动选择|PUA-DIAGNOSIS|三条红线|四权/, "声明不得含方法论字面量或完整协议");
 
+  // pi 语义：扩展不返回 systemPrompt 时系统提示被重置回 base，故必须每次注入
   const prompt2 = await agentStart(handlers, disabledCtx);
-  assert.equal(prompt2, "BASE", "第二次起应完全静默");
+  assert.match(prompt2, /免注入模型/, "第二次仍应注入禁用声明");
+
+  // 无“已注入”残留状态：切到另一禁用模型，声明应跟随新模型 id
+  const otherDisabledCtx = { ...ctx, model: { provider: "kimi-coding", id: "k3-128k" } };
+  const prompt3 = await agentStart(handlers, otherDisabledCtx);
+  assert.match(prompt3, /kimi-coding\/k3-128k/, "切换禁用模型后声明应含新模型 id");
 });
 
 test("禁用模型：tool_result 失败不计数（门控同步生效）", async () => {
