@@ -2,11 +2,12 @@
  * Stub 类型声明：为仓库内 VS Code 消除飘红。
  *
  * 本目录下的 .ts 文件是“复制到目标环境安装”的扩展，
- * 运行时依赖目标机器上已安装的 `@mariozechner/pi-coding-agent`
+ * 运行时依赖目标机器上已安装的 `@earendil-works/pi-coding-agent`
+ * （pi 现发布包名；旧名 `@mariozechner/pi-coding-agent` 已停更于 0.73.1）
  * 及 Node.js 内置模块，因此仓库内只做最简声明即可。
  */
 
-declare module "@mariozechner/pi-coding-agent" {
+declare module "@earendil-works/pi-coding-agent" {
   export interface ExtensionAPI {
     on(
       event:
