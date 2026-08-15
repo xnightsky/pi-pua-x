@@ -32,7 +32,7 @@
 
 ## 前置条件
 
-1. **pi 已安装** — 本扩展是 pi 的插件，需先安装 [pi](https://github.com/nicepkg/pi-coding-agent)。
+1. **pi 已安装** — 本扩展是 pi 的插件，需先安装 [pi](https://github.com/earendil-works/pi)。
 2. **Node.js ≥ 18** — pi 运行依赖 Node.js，建议用最新 LTS 版本。
 3. **tanweai/pua skill（前置依赖，强烈推荐）** — PUA 行为协议的核心规则文件。扩展本身有内置 fallback，但完整体验需要 skill 的 references/ 目录（flavors、methodology 等）。
 
@@ -410,6 +410,8 @@ check_pi_package "pi-ask-user" "pi install npm:pi-ask-user"
 | `/pua-x-sync-skills` | 一键同步 tanweai/pua 上游 references（flavors、methodology 等） |
 
 > `/pua-model` 用于按模型粒度关闭 PUA，定位是**按需开关**：新一代模型（如 Anthropic Opus 4.5+）经反谄媚/反情感操纵训练并建立指令层级后，会抵抗 PUA 式话语施压（社区普遍观察到 Opus 系列上 PUA「不触发 / 不表演」），且高阶模型对 PUA 的依赖本身更低（高自主性是默认行为）。对这类模型注入 PUA 只会浪费 token 且无行为收益，建议用 `/pua-model disable <pattern>` 排除，让 PUA 只作用于能获得行为增益的模型。配置字段 `disabled_models` 见下文示例；原理与证据分层详见 [README 模型兼容性](./README.md)。
+>
+> 与 `pi-subagents` 联用时：子代理是独立 pi 子进程，默认继承主会话模型并 ambient 加载本扩展、独立重做禁用门控，无需额外配置；但子代理可被调用参数 `model`、agent frontmatter、`subagents.defaultModel` 切到别的模型，此时主会话的禁用判定对其不适用，需用 pi-subagents 的 `subagents.modelScope` 白名单把子代理模型收敛到非禁用集合。
 
 ## 配置文件
 
@@ -444,7 +446,7 @@ check_pi_package "pi-ask-user" "pi install npm:pi-ask-user"
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `disabled_models` | string[] | `[]` | glob 模式匹配禁用 PUA 的模型，匹配时跳过协议注入 + 所有 hook |
+| `disabled_models` | string[] | `[]` | glob 模式匹配禁用 PUA 的模型；匹配时跳过协议注入、静默所有 hook，并在每次 `before_agent_start` 注入一条极简禁用声明（pi 每个用户 prompt 会重置 system prompt，一次性注入会失效），防止模型从技能目录自行加载 pua skill 绕过门控 |
 | `enforcement_level` | `"observe"` \| `"suggest"` \| `"enforce"` | `"suggest"` | observe=只通知，suggest=通知+确认，enforce=自动 block |
 | `integrity_guard` | boolean | `true` | 四权分立保护（写入 tests/CI/secrets 时提示或拦截） |
 | `frustration_detection` | boolean | `true` | 用户挫败检测（仅交互模式） |

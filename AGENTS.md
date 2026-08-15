@@ -34,6 +34,7 @@
 - 本仓库只有集成测试（`integration-tests/*.ittest.*`），全部消耗真实 AI token，不进入默认批量回归。
 - `integration-tests/pua.ittest.sh` / `pua.ittest.ps1`：核心功能集成测试（加载、失败计数、压力升级、成功清零、开关持久化、味道切换、skill 缺失保护、能力状态、分层失败检测）。
 - `integration-tests/pua-enforcement.ittest.ps1`：增强 hook 专项测试（挫败检测、四权分立、重复命令）。
+- `integration-tests/pua-disable-notice.ittest.sh` / `.ps1`：禁用模型声明注入专项测试（默认模型 `deepseek/deepseek-v4-flash`，派生禁用模式 `*/deepseek-*`；临时目录构造桩 skill 作 cwd；断言禁用声明可被模型逐字引用、对照组不注入、真实工具失败不计数）。
 - 测试脚本支持 `-Model` / `-Provider` 参数，默认用 `deepseek/deepseek-v4-flash`（快速且便宜）。
 - 测试脚本用 `--no-extensions` 隔离全局扩展，显式 `-e` 加载本地扩展和所需外部扩展。
 - 纯逻辑函数（`enforcement.ts` 中的 `detectFrustration`、`checkIntegrity`、`CommandHistory`、`analyzeTurn` 等）可在未来补单元测试；当前以集成测试为主。

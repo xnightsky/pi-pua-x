@@ -43,7 +43,7 @@ PUA 后续开发默认使用下面的跨平台基线组合。`pua.ittest.*` 会�
 
 | 能力缺口 | 推荐插件 | 取舍 |
 |----------|----------|------|
-| 子任务拆分 | `pi-subagents` | 适合把 L2/L3 失败分给 scout、researcher、reviewer；子 agent prompt 会继承 PUA capsule，不要和另一套 subagent 插件同时启用 |
+| 子任务拆分 | `pi-subagents` | 适合把 L2/L3 失败分给 scout、researcher、reviewer；子 agent 是独立 pi 子进程，默认 ambient 加载本扩展并独立执行 PUA 门控/注入（主会话 tool_call capsule 只可靠覆盖单代理调用的顶层 `task` 字段，`workflowScript`/`chain`/`parallel` 嵌套任务除外）；不要和另一套 subagent 插件同时启用 |
 | 计划模式 | `@ifi/pi-plan` | 适合连续失败后先产出计划、再执行；属于流程能力，不是 PUA 本体 |
 | 规格化落地 | `@ifi/pi-spec` | 适合需求较重或跨文件方案，成本高于普通计划模式 |
 | 后台观察 | `@ifi/pi-background-tasks` | 适合长命令、服务启动、日志跟踪；和 PowerShell job 可按平台择一使用 |

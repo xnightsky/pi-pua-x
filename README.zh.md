@@ -2,7 +2,7 @@
 
 > [英文版本](./README.md) | 中文版本
 
-[pi](https://github.com/nicepkg/pi-coding-agent) 的状态化 PUA 运行时扩展 —— 生命周期钩子、压力升级、能力感知增强与子代理继承。基于 [tanweai/pua](https://github.com/tanweai/pua) 构建。
+[pi](https://github.com/earendil-works/pi) 的状态化 PUA 运行时扩展 —— 生命周期钩子、压力升级、能力感知增强与子代理继承。基于 [tanweai/pua](https://github.com/tanweai/pua) 构建。
 
 ## 这是什么？
 
@@ -72,7 +72,7 @@ PUA 的生效依赖「话语施压 + 确定性 hook 强制」。新一代前沿�
 - **上游 `tanweai/pua` 没有按模型的兼容性矩阵（兼容性按平台划分）**，但社区普遍观察到 Opus 系列上 PUA「不触发 / 不表演」——Opus 对施压式话术的顺从度更低。此外，Opus 4.8 的工具调用序列化缺陷（anthropics/claude-code #67307、#63481）会破坏本运行时依赖的确定性 hook 链路——这是**工程层**的失效，而不只是说服层失效。
 - **高阶模型对 PUA 的依赖本身也在下降**（推论，非官方表述）：高自主性（不放弃、穷尽方案、验证后才宣称完成）已是它们的默认训练行为，外部施压换不来额外行为增益，只是上下文里的噪音。
 
-结论：在这些模型上，PUA 注入**要么无效、要么有害**——白白消耗 token、损耗信任，却换不来行为收益。`/pua-model` 让 PUA 成为**按需开关**：在真正能获得行为增益的模型上保持开启，对既不响应施压也不需要它的高阶模型（glob 模式，如 `anthropic/claude-opus*`）直接排除。被禁用的模型执行 **L2 完全禁用**：不注入协议、不挂任何 hook、完全静默。匹配逻辑详见 [docs/DESIGN.md](./docs/DESIGN.md)。
+结论：在这些模型上，PUA 注入**要么无效、要么有害**——白白消耗 token、损耗信任，却换不来行为收益。`/pua-model` 让 PUA 成为**按需开关**：在真正能获得行为增益的模型上保持开启，对既不响应施压也不需要它的高阶模型（glob 模式，如 `anthropic/claude-opus*`）直接排除。被禁用的模型执行 **L2 完全禁用**：不注入协议、不挂任何 hook；另在每次 `before_agent_start` 注入一条极简禁用声明（pi 每个用户 prompt 会把 system prompt 重置回 base，一次性注入会失效），明示该模型免注入、不要从 pi 技能目录自行加载 pua skill（hook 门控管不到的唯一路径）。匹配逻辑详见 [docs/DESIGN.md](./docs/DESIGN.md)。
 
 ## 配置
 

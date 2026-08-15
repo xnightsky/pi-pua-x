@@ -352,6 +352,29 @@ PI 的 `tool_call` 也可用于后续实现强约束,但不属于当前已实现
 4. 所有 hook（`tool_result`、`tool_call`、`input`、`turn_end`、`session_before_compact`）在入口处检查 `state.modelDisabled`，命中则直接 return。
 5. 下次 `before_agent_start` 重新检测，模型变化自动跟随。
 
+### skill 目录绕过与禁用声明
+
+hook 静默只管得住扩展自身，管不住 pi 的技能目录：pi 的系统提示始终携带 `<available_skills>` 目录（skill 的 name/description/location，lazy-load），模型失败后可自行用 `read` 工具读 pua 的 SKILL.md 并启用其方法论，完全绕过 `disabled_models` 门控。
+
+因此禁用模型命中时，扩展在**每次** `before_agent_start` 往 system prompt 追加一条极简声明（`buildDisableNotice`）：明示当前模型已标记为免注入、不要加载或启用 pua skill 的方法论，遇失败按常规工程方式复盘。必须每次注入：pi 在用户 prompt 时若扩展不返回 `systemPrompt` 会把系统提示重置回 base（`agent-session.js` 的 `prompt()` 路径），一次性注入只能覆盖到下一次用户 prompt 为止。声明仅两行，token 成本可忽略；模型切换时声明中的模型 id 自动跟随（无"已注入"残留状态）。
+
+声明文本的两条硬约束：
+
+- **不夹带完整协议**：禁用声明不是降级版协议，只声明禁止行为与替代路径。
+- **反启动效应（priming）**：不得引用方法论的任何具体标记、话术或格式字面量——负向指令中复述被禁形态会反向提高其输出概率。
+
+已知边界（由 pi 的机制决定）：
+
+- 压缩（compaction）只替换消息历史、不动 system prompt，注入不会被压缩丢弃；溢出压缩后的自动重试也不重新触发 `before_agent_start`，声明沿存。
+- E2E 验证时注意：settings.json 的 `defaultModel` 必须同时登记在 `enabledModels` 中，否则 pi 静默回退到旧默认模型（无报错）；经 `--model`/`--provider` CLI 参数指定模型不受此限制，itest 一律走 CLI 参数。
+- 声明的触发条件 `hasPuaSkill()` 是磁盘嗅探（`findSkillDirs`），与 pi 的技能发现路径对齐：用户级 `~/.agents/skills`、`~/.pi/agent/skills`，项目级 `<cwd>/.pi/skills`，以及 **cwd 祖先链上每一级 `.agents/skills`**（向上到 git root 即止，对齐 pi 的 `collectAncestorAgentsSkillDirs`）——pua skill 装在 monorepo 父目录/git root 时也能探测到。未覆盖的边缘路径：npm 包自带的 skills、`--skills` 显式路径。
+- pi 核心没有 subagent 概念；子代理由 pi-subagents 等插件以独立 pi 子进程实现。对 pi-subagents（v0.50.0）的实测结论：
+  - 子进程默认保留 ambient 扩展发现，本扩展会在子代理进程里独立加载，重新执行 `disabled_models` 判定与禁用声明注入；子进程显式携带 `--model <父会话模型>`，默认场景判定一致。
+  - 子代理默认 `--no-skills`（内置 agents 均 `inheritSkills: false`），技能目录不进子代理提示——skill 自加载绕过路径在子代理侧天然不存在。
+  - 子进程是单 prompt headless 会话（`--mode json -p`），`before_agent_start` 只触发一次，声明恰好覆盖子会话全程。
+  - 残余缺口均为用户的显式配置：`subagents.defaultExtensions: []` 或 agent frontmatter 声明 `extensions` 会让子进程 `--no-extensions`；子代理模型可被调用参数 `model`、frontmatter、`subagents.defaultModel`、`fallbackModels` 切换（此时主会话判定不适用，正确控制点是 pi-subagents 的 `subagents.modelScope` 白名单）；`runner: external-cli` 的 agent 完全不经 pi 子进程，本扩展无从介入。
+  - 主会话 `tool_call` capsule 注入对 pi-subagents 只可靠覆盖单代理调用的顶层 `task` 字段；`workflowScript`（任务嵌在 JS 源码字符串内）与 `chain[].task` / `parallel[].task` 嵌套结构触达不到，不作为子代理路径的防线。
+
 ### 命令
 
 - `/pua-model list` — 列出当前禁用模式。
